@@ -1,0 +1,18 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Allow authenticated users to read all users' data
+    match /users/{userId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && request.auth.uid == userId;
+    }
+    
+    // Allow authenticated users to read all stocks
+    // But only allow users to modify their own stocks
+    match /stocks/{stockId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && 
+        request.resource.data.userId == request.auth.uid;
+    }
+  }
+} 
