@@ -68,6 +68,7 @@ function SignUp() {
         major,
         studyYear,
         createdAt: new Date().toISOString(),
+        balance: 30000,
       });
 
       toast({

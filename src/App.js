@@ -13,6 +13,7 @@ import Dashboard from "./components/Dashboard";
 import Leaderboard from "./components/Leaderboard";
 import Trading from "./components/Trading";
 import Navbar from "./components/Navbar";
+import theme from "./theme";
 
 const PrivateRoute = ({ children }) => {
   const { currentUser } = useAuth();
@@ -21,7 +22,7 @@ const PrivateRoute = ({ children }) => {
 
 function App() {
   return (
-    <ChakraProvider>
+    <ChakraProvider theme={theme}>
       <CSSReset />
       <AuthProvider>
         <Router>

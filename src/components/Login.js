@@ -63,10 +63,11 @@ function Login() {
       >
         <VStack spacing={6}>
           <Heading
-            bgGradient="linear(to-r, blue.400, purple.500)"
-            bgClip="text"
-            fontSize={{ base: "2xl", md: "3xl" }}
+            as="h2"
+            size="xl"
             fontWeight="extrabold"
+            mb={6}
+            color="uoft.navy"
           >
             Welcome Back
           </Heading>
