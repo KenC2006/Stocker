@@ -68,5 +68,28 @@ node_modules/
 # dataconnect generated files
 .dataconnect
 
+# Node modules
 node_modules/
+
+# Build output
+build/
+dist/
+
+# Cache directories
 .cache/
+.next/
+out/
+coverage/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Env files
+.env.*
+
+# VSCode settings
+.vscode/
+
+# Ignore by default
+*.local
