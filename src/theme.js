@@ -22,40 +22,98 @@ const colors = {
 };
 
 const theme = extendTheme({
-  colors,
+  colors: {
+    ...colors,
+    brand: {
+      50: "#ebf8ff",
+      100: "#bee3f8",
+      200: "#90cdf4",
+      300: "#63b3ed",
+      400: "#4299e1",
+      500: "#3182ce",
+      600: "#2b6cb0",
+      700: "#2c5282",
+      800: "#2a4365",
+      900: "#1A365D",
+    },
+  },
   styles: {
     global: {
       body: {
-        bg: "gray.50",
+        bgGradient: {
+          base: "linear(to-r, blue.100, blue.300)",
+          _dark: "linear(to-r, blue.700, blue.900)",
+        },
       },
     },
+  },
+  fonts: {
+    heading: "Inter, system-ui, sans-serif",
+    body: "Inter, system-ui, sans-serif",
+    mono: "Inter, Menlo, monospace",
   },
   components: {
     Button: {
       defaultProps: {
-        colorScheme: "uoft",
+        colorScheme: "blue",
       },
       variants: {
         solid: {
-          bg: "uoft.navy",
+          bg: "blue.500",
           color: "white",
           _hover: {
-            bg: "uoft.lightBlue",
+            bg: "blue.600",
+          },
+          _dark: {
+            bg: "blue.700",
+            color: "white",
+            _hover: {
+              bg: "blue.800",
+              color: "white",
+            },
           },
         },
         outline: {
-          borderColor: "uoft.navy",
-          color: "uoft.navy",
+          borderColor: "blue.500",
+          color: "blue.500",
           _hover: {
-            bg: "uoft.navy",
+            bg: "blue.500",
             color: "white",
+          },
+          _dark: {
+            borderColor: "blue.300",
+            color: "blue.300",
+            _hover: {
+              bg: "blue.700",
+              color: "white",
+            },
+          },
+        },
+      },
+    },
+    Tab: {
+      baseStyle: {
+        _selected: {
+          bg: "blue.200",
+          color: "blue.900",
+          fontWeight: "bold",
+        },
+        _dark: {
+          _selected: {
+            bg: "blue.700",
+            color: "white",
+            fontWeight: "bold",
+            boxShadow: "0 0 0 2px #3182ce",
           },
         },
       },
     },
     Heading: {
       baseStyle: {
-        color: "uoft.navy",
+        color: "blue.900",
+        _dark: {
+          color: "white",
+        },
       },
     },
   },

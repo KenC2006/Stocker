@@ -37,10 +37,13 @@ import {
   AlertIcon,
   Progress,
   Skeleton,
+  HStack,
+  Flex,
 } from "@chakra-ui/react";
 import { SearchIcon } from "@chakra-ui/icons";
 import axios from "axios";
 import { useAuth } from "../contexts/AuthContext";
+import { useLocation } from "react-router-dom";
 import { db } from "../config/firebase";
 import {
   collection,
@@ -52,15 +55,17 @@ import {
   doc,
   getDoc,
   updateDoc,
+  writeBatch,
+  serverTimestamp,
+  increment,
 } from "firebase/firestore";
-
-// Cache for storing stock prices
-const priceCache = new Map();
-// Track API calls
-let apiCallsCount = 0;
-let lastResetTime = Date.now();
-const API_CALL_LIMIT = 5;
-const CACHE_DURATION = 60000; // 1 minute cache
+import {
+  FaChartLine,
+  FaSearch,
+  FaArrowRight,
+  FaInfoCircle,
+} from "react-icons/fa";
+import { fetchStockPrice, fetchStockPrices } from "../services/stockService";
 
 function Trading() {
   const [symbol, setSymbol] = useState("");
@@ -69,101 +74,101 @@ function Trading() {
   const [quantity, setQuantity] = useState(1);
   const [portfolio, setPortfolio] = useState([]);
   const [loadingPortfolio, setLoadingPortfolio] = useState(true);
-  const [apiCallsRemaining, setApiCallsRemaining] = useState(API_CALL_LIMIT);
-  const [cooldownTime, setCooldownTime] = useState(0);
-  const { currentUser } = useAuth();
-  const toast = useToast();
   const [userData, setUserData] = useState(null);
   const [sellQuantities, setSellQuantities] = useState({});
+  const location = useLocation();
+
+  const { currentUser } = useAuth();
+  const toast = useToast();
 
   const bgColor = useColorModeValue("white", "gray.800");
   const borderColor = useColorModeValue("gray.200", "gray.600");
+  const mainTextColor = useColorModeValue("blue.900", "white");
+  const subTextColor = useColorModeValue("gray.600", "gray.200");
+  const statNumberColor = useColorModeValue("blue.800", "blue.200");
+  const pageBgColor = useColorModeValue("gray.50", "gray.900");
+  const cardBgColor = useColorModeValue("white", "gray.800");
+  const cardBorderColor = useColorModeValue("blue.400", borderColor);
+  const tableHeaderBg = useColorModeValue("blue.100", "blue.800");
+  const tableRowAltBg = useColorModeValue("white", "blue.800");
+  const tableRowBg = useColorModeValue("blue.50", "blue.900");
+  const buyButtonGradient = useColorModeValue(
+    "linear(to-r, blue.400, blue.600)",
+    "linear(to-r, blue.700, blue.900)"
+  );
+  const buyButtonHover = useColorModeValue("blue.600", "blue.400");
+  const sellButtonBg = useColorModeValue("red.500", "red.400");
+  const sellButtonColor = useColorModeValue("white", "blue.900");
+  const sellButtonHover = useColorModeValue("red.600", "red.300");
+  const tabSelectedBg = useColorModeValue("blue.200", "blue.700");
+  const tabSelectedColor = useColorModeValue("blue.900", "white");
+  const numberInputBg = useColorModeValue("gray.100", "gray.700");
 
-  useEffect(() => {
-    fetchPortfolio();
-    // Reset cooldown timer
-    const timer = setInterval(() => {
-      const now = Date.now();
-      if (now - lastResetTime >= 60000) {
-        apiCallsCount = 0;
-        lastResetTime = now;
-        setApiCallsRemaining(API_CALL_LIMIT);
-        setCooldownTime(0);
-      } else if (apiCallsCount >= API_CALL_LIMIT) {
-        setCooldownTime(60 - Math.floor((now - lastResetTime) / 1000));
-      }
-    }, 1000);
+  // Blue gradient for hover and avatar
+  const blueGradient = useColorModeValue(
+    "linear(to-r, blue.400, blue.600)",
+    "linear(to-r, blue.700, blue.900)"
+  );
+  const blueSolid = useColorModeValue("blue.600", "blue.400");
 
-    const fetchUserData = async () => {
-      if (!currentUser) return;
-      try {
-        const userDoc = await getDoc(doc(db, "users", currentUser.uid));
-        if (userDoc.exists()) {
-          setUserData(userDoc.data());
-        }
-      } catch (error) {
-        console.error("Error fetching user data:", error);
-      }
-    };
-    fetchUserData();
+  // Use solid blue for avatar and row hover
+  const solidAvatarBg = useColorModeValue("blue.600", "blue.300");
+  const solidAvatarColor = "white";
+  const tableRowHoverBg = useColorModeValue("blue.50", "blue.900");
 
-    return () => clearInterval(timer);
-  }, [currentUser]);
+  // For P/L badge (only green and red)
+  const badgePositiveColorScheme = "green";
+  const badgeNegativeColorScheme = "red";
+  const badgePositiveBg = useColorModeValue("green.100", "green.700");
+  const badgeNegativeBg = useColorModeValue("red.100", "red.700");
+  const badgePositiveColor = useColorModeValue("green.800", "green.200");
+  const badgeNegativeColor = useColorModeValue("red.800", "red.200");
 
-  const checkRateLimit = () => {
-    const now = Date.now();
-    if (now - lastResetTime >= 60000) {
-      apiCallsCount = 0;
-      lastResetTime = now;
-      setApiCallsRemaining(API_CALL_LIMIT);
-      return true;
-    }
+  const tableRowBorderBottom = useColorModeValue(
+    "1px solid #90cdf4",
+    "1px solid #2b6cb0"
+  );
 
-    if (apiCallsCount >= API_CALL_LIMIT) {
-      toast({
-        title: "Rate Limit Reached",
-        description: "Please wait a minute before making more requests.",
-        status: "warning",
-        duration: 5000,
-        isClosable: true,
-      });
-      return false;
-    }
+  // Add new color mode values
+  const stockHeaderBg = useColorModeValue("gray.50", "gray.700");
+  const tradingControlsBg = useColorModeValue("gray.50", "gray.700");
+  const cardShadow = useColorModeValue("lg", "dark-lg");
 
-    return true;
-  };
+  // Consolidated data fetching
+  const fetchData = async () => {
+    if (!currentUser) return;
 
-  const getCachedPrice = (stockSymbol) => {
-    const cached = priceCache.get(stockSymbol);
-    if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
-      return cached.data;
-    }
-    return null;
-  };
-
-  const fetchPortfolio = async () => {
+    setLoadingPortfolio(true);
     try {
-      const q = query(
-        collection(db, "stocks"),
-        where("userId", "==", currentUser.uid)
-      );
-      const querySnapshot = await getDocs(q);
-      const stocksRaw = querySnapshot.docs.map((doc) => ({
+      // Fetch user data and stocks in parallel
+      const [userDoc, stocksSnapshot] = await Promise.all([
+        getDoc(doc(db, "users", currentUser.uid)),
+        getDocs(
+          query(
+            collection(db, "stocks"),
+            where("userId", "==", currentUser.uid)
+          )
+        ),
+      ]);
+
+      // Process user data
+      if (userDoc.exists()) {
+        setUserData(userDoc.data());
+      }
+
+      // Process portfolio data
+      const stocksRaw = stocksSnapshot.docs.map((doc) => ({
         id: doc.id,
         ...doc.data(),
       }));
-      // Deduplicate symbols
+
+      // Get prices for all stocks
       const uniqueSymbols = [
         ...new Set(stocksRaw.map((stock) => stock.symbol)),
       ];
-      // Fetch prices for unique symbols only
-      const priceMap = {};
-      await Promise.all(
-        uniqueSymbols.map(async (symbol) => {
-          priceMap[symbol] = await fetchStockPrice(symbol);
-        })
-      );
-      // Build stocks with price data
+      const priceMap = await fetchStockPrices(uniqueSymbols);
+
+      // Build portfolio with price data
       const stocks = stocksRaw.map((stock) => {
         const priceData = priceMap[stock.symbol];
         if (priceData) {
@@ -177,22 +182,22 @@ function Trading() {
               ((priceData.price - stock.purchasePrice) / stock.purchasePrice) *
               100,
           };
-        } else {
-          return {
-            ...stock,
-            currentPrice: 0,
-            totalValue: 0,
-            profitLoss: 0,
-            profitLossPercentage: 0,
-          };
         }
+        return {
+          ...stock,
+          currentPrice: stock.purchasePrice, // Fallback to purchase price if current price unavailable
+          totalValue: stock.purchasePrice * stock.quantity,
+          profitLoss: 0,
+          profitLossPercentage: 0,
+        };
       });
+
       setPortfolio(stocks);
     } catch (error) {
-      console.error("Error fetching portfolio:", error);
+      console.error("Error fetching data:", error);
       toast({
         title: "Error",
-        description: "Failed to fetch portfolio",
+        description: "Failed to fetch portfolio data. Please try again.",
         status: "error",
         duration: 5000,
         isClosable: true,
@@ -202,68 +207,19 @@ function Trading() {
     }
   };
 
-  const validateSymbol = (symbol) => {
-    if (!symbol || typeof symbol !== "string") {
-      throw new Error("Please enter a stock symbol");
-    }
+  // Initial data fetch and refresh on route change
+  useEffect(() => {
+    fetchData();
+  }, [currentUser, location.pathname]);
 
-    const trimmedSymbol = symbol.trim().toUpperCase();
-    if (!trimmedSymbol) {
-      throw new Error("Please enter a stock symbol");
-    }
+  // Periodic refresh of portfolio data
+  useEffect(() => {
+    if (!portfolio.length) return;
 
-    if (!trimmedSymbol.match(/^[A-Z]+$/)) {
-      throw new Error(
-        "Invalid symbol format. Please use only letters (e.g., AAPL, MSFT, GOOGL)"
-      );
-    }
+    const interval = setInterval(fetchData, 60000); // Refresh every minute
 
-    return trimmedSymbol;
-  };
-
-  const fetchStockPrice = async (stockSymbol) => {
-    try {
-      if (!stockSymbol || !stockSymbol.match(/^[A-Za-z]+$/)) {
-        throw new Error("Invalid symbol format. Use letters only.");
-      }
-
-      const cachedData = getCachedPrice(stockSymbol);
-      if (cachedData) return cachedData;
-
-      const response = await axios.get("https://finnhub.io/api/v1/quote", {
-        params: {
-          symbol: stockSymbol,
-          token: "d0vg651r01qkepd02btgd0vg651r01qkepd02bu0",
-        },
-      });
-
-      const data = response.data;
-      if (!data || data.c === 0) {
-        throw new Error(`Symbol '${stockSymbol}' not found.`);
-      }
-
-      const stockData = {
-        symbol: stockSymbol,
-        price: data.c,
-        previousClose: data.pc,
-        change: data.c - data.pc,
-        changePercent: ((data.c - data.pc) / data.pc) * 100,
-        currency: "USD",
-        exchange: "Finnhub",
-        timestamp: new Date().toLocaleString(),
-      };
-
-      priceCache.set(stockSymbol, {
-        data: stockData,
-        timestamp: Date.now(),
-      });
-
-      return stockData;
-    } catch (error) {
-      console.error("Finnhub API error:", error.message);
-      throw new Error("Unable to fetch stock data from Finnhub.");
-    }
-  };
+    return () => clearInterval(interval);
+  }, [portfolio.length]);
 
   const searchStock = async () => {
     if (!symbol) {
@@ -280,7 +236,6 @@ function Trading() {
     setLoading(true);
     try {
       const upperSymbol = symbol.trim().toUpperCase();
-
       const stockData = await fetchStockPrice(upperSymbol);
 
       setStockData({
@@ -288,7 +243,6 @@ function Trading() {
         ...stockData,
       });
 
-      // Clear any previous error messages
       toast.closeAll();
     } catch (error) {
       toast({
@@ -301,19 +255,6 @@ function Trading() {
       setStockData(null);
     } finally {
       setLoading(false);
-    }
-  };
-
-  // Helper to refresh user data
-  const refreshUserData = async () => {
-    if (!currentUser) return;
-    try {
-      const userDoc = await getDoc(doc(db, "users", currentUser.uid));
-      if (userDoc.exists()) {
-        setUserData(userDoc.data());
-      }
-    } catch (error) {
-      console.error("Error refreshing user data:", error);
     }
   };
 
@@ -341,126 +282,182 @@ function Trading() {
       toast({
         title: "Market Closed",
         description:
-          "Trading is only allowed Monday through Friday, 9:30am to 4:00pm Eastern Time.",
+          "Trading is only allowed during market hours (Mon-Fri, 9:30am-4:00pm ET)",
         status: "warning",
         duration: 5000,
         isClosable: true,
       });
       return;
     }
+
     if (!stockData || !quantity) return;
-    if (!userData) return;
-    const totalCost = stockData.price * quantity;
-    if (type === "buy") {
-      if (userData.balance < totalCost) {
+
+    try {
+      const batch = writeBatch(db);
+      const cost = stockData.price * quantity;
+
+      if (type === "buy") {
+        if (cost > userData.balance) {
+          throw new Error("Insufficient funds");
+        }
+
+        // Update user balance
+        const userRef = doc(db, "users", currentUser.uid);
+        batch.update(userRef, {
+          balance: userData.balance - cost,
+        });
+
+        // Check if user already owns this stock
+        const existingStockQuery = query(
+          collection(db, "stocks"),
+          where("userId", "==", currentUser.uid),
+          where("symbol", "==", stockData.symbol)
+        );
+        const existingStockDocs = await getDocs(existingStockQuery);
+
+        if (!existingStockDocs.empty) {
+          // Update existing position
+          const existingStock = existingStockDocs.docs[0];
+          const newQuantity = existingStock.data().quantity + quantity;
+          const newAvgPrice =
+            (existingStock.data().purchasePrice *
+              existingStock.data().quantity +
+              cost) /
+            newQuantity;
+
+          batch.update(existingStock.ref, {
+            quantity: newQuantity,
+            purchasePrice: newAvgPrice,
+          });
+        } else {
+          // Create new position
+          const stockRef = doc(collection(db, "stocks"));
+          batch.set(stockRef, {
+            userId: currentUser.uid,
+            symbol: stockData.symbol,
+            quantity: quantity,
+            purchasePrice: stockData.price,
+            timestamp: serverTimestamp(),
+          });
+        }
+
+        // Commit the batch
+        await batch.commit();
+
+        // Optimistically update state
+        setUserData((prev) => ({
+          ...prev,
+          balance: prev.balance - cost,
+        }));
+
+        // Only fetch portfolio if it's a new position
+        if (existingStockDocs.empty) {
+          await fetchData();
+        } else {
+          // Optimistically update portfolio for existing position
+          setPortfolio((prev) =>
+            prev.map((stock) =>
+              stock.symbol === stockData.symbol
+                ? {
+                    ...stock,
+                    quantity: stock.quantity + quantity,
+                    purchasePrice:
+                      (stock.purchasePrice * stock.quantity + cost) /
+                      (stock.quantity + quantity),
+                  }
+                : stock
+            )
+          );
+        }
+
         toast({
-          title: "Insufficient Balance",
-          description: `You do not have enough cash to complete this purchase. Required: $${totalCost.toFixed(
-            2
-          )}, Available: $${userData.balance.toFixed(2)}`,
-          status: "error",
-          duration: 5000,
+          title: "Success",
+          description: `Successfully bought ${quantity} shares of ${stockData.symbol}`,
+          status: "success",
+          duration: 4000,
           isClosable: true,
         });
-        return;
       }
-    }
-    try {
-      let newPortfolio = [...portfolio];
-      let newBalance = userData.balance;
-      if (type === "buy") {
-        // Always create a new stock document, even if the user already owns this stock
-        const tradeData = {
-          userId: currentUser.uid,
-          symbol: stockData.symbol,
-          quantity: Number(quantity),
-          purchasePrice: stockData.price,
-          tradeType: type,
-          timestamp: new Date().toISOString(),
-        };
-        await addDoc(collection(db, "stocks"), tradeData);
-        // Optimistically update local state
-        newPortfolio.push({
-          id: `temp-${Date.now()}`,
-          ...tradeData,
-          currentPrice: stockData.price,
-          totalValue: stockData.price * Number(quantity),
-          profitLoss: 0,
-          profitLossPercentage: 0,
-        });
-        newBalance -= totalCost;
-      } else if (type === "sell") {
-        // ... existing sell logic ...
-      }
-      await updateDoc(doc(db, "users", currentUser.uid), {
-        balance: newBalance,
-      });
-      setUserData({ ...userData, balance: newBalance });
-      setPortfolio(newPortfolio);
-      toast({
-        title: "Success",
-        description: `Successfully ${
-          type === "buy" ? "bought" : "sold"
-        } ${quantity} shares of ${stockData.symbol}`,
-        status: "success",
-        duration: 5000,
-        isClosable: true,
-      });
-      // Optionally, you can refetch from Firebase for consistency, but not always necessary
-      // fetchPortfolio();
-      // await refreshUserData();
     } catch (error) {
       toast({
         title: "Error",
-        description: `Failed to ${type} stock`,
-        status: "error",
-        duration: 5000,
-        isClosable: true,
-      });
-    }
-  };
-
-  const handleSell = async (stock, sellQuantity) => {
-    if (sellQuantity < 1 || sellQuantity > stock.quantity) {
-      toast({
-        title: "Invalid Quantity",
-        description: `You can only sell between 1 and ${stock.quantity} shares.`,
+        description: error.message,
         status: "error",
         duration: 4000,
         isClosable: true,
       });
+      console.error("Trade error:", error);
+    }
+  };
+
+  const handleSell = async (stock, sellQuantity) => {
+    if (!marketOpen) {
+      toast({
+        title: "Market Closed",
+        description:
+          "Trading is only allowed during market hours (Mon-Fri, 9:30am-4:00pm ET)",
+        status: "warning",
+        duration: 5000,
+        isClosable: true,
+      });
       return;
     }
+
     try {
-      const proceeds = stock.currentPrice * sellQuantity;
+      // Get latest price
+      const priceData = await fetchStockPrice(stock.symbol);
+      const proceeds = priceData.price * sellQuantity;
+
+      const batch = writeBatch(db);
+
+      // Update user balance
+      const userRef = doc(db, "users", currentUser.uid);
+      batch.update(userRef, {
+        balance: increment(proceeds),
+      });
+
+      // Update or delete stock position
+      const stockRef = doc(db, "stocks", stock.id);
       if (sellQuantity === stock.quantity) {
-        // Sell all: delete the stock document
-        await deleteDoc(doc(db, "stocks", stock.id));
+        batch.delete(stockRef);
       } else {
-        // Sell part: update the stock document
-        await updateDoc(doc(db, "stocks", stock.id), {
+        batch.update(stockRef, {
           quantity: stock.quantity - sellQuantity,
         });
       }
-      // Optimistically update local state
-      let newPortfolio = portfolio
-        .map((s) => {
-          if (s.id === stock.id) {
-            if (sellQuantity === stock.quantity) {
-              return null; // Remove stock
-            } else {
-              return { ...s, quantity: s.quantity - sellQuantity };
+
+      // Commit the batch
+      await batch.commit();
+
+      // Optimistically update state
+      setUserData((prev) => ({
+        ...prev,
+        balance: prev.balance + proceeds,
+      }));
+
+      // Optimistically update portfolio
+      setPortfolio((prev) =>
+        prev
+          .map((s) => {
+            if (s.id === stock.id) {
+              if (sellQuantity === s.quantity) {
+                return null; // Remove stock
+              }
+              return {
+                ...s,
+                quantity: s.quantity - sellQuantity,
+                currentPrice: priceData.price,
+                totalValue: priceData.price * (s.quantity - sellQuantity),
+                profitLoss:
+                  (priceData.price - s.purchasePrice) *
+                  (s.quantity - sellQuantity),
+              };
             }
-          }
-          return s;
-        })
-        .filter(Boolean);
-      const newBalance = (userData?.balance || 0) + proceeds;
-      await updateDoc(doc(db, "users", currentUser.uid), {
-        balance: newBalance,
-      });
-      setUserData({ ...userData, balance: newBalance });
-      setPortfolio(newPortfolio);
+            return s;
+          })
+          .filter(Boolean)
+      );
+
       toast({
         title: "Success",
         description: `Successfully sold ${sellQuantity} shares of ${stock.symbol}`,
@@ -468,13 +465,10 @@ function Trading() {
         duration: 4000,
         isClosable: true,
       });
-      // Optionally, you can refetch from Firebase for consistency, but not always necessary
-      // fetchPortfolio();
-      // await refreshUserData();
     } catch (error) {
       toast({
         title: "Error",
-        description: `Failed to sell stock: ${error.message}`,
+        description: error.message,
         status: "error",
         duration: 4000,
         isClosable: true,
@@ -483,377 +477,382 @@ function Trading() {
     }
   };
 
-  // Periodically refresh price for the currently selected stock in the trading tab every minute
+  // Add refresh for currently selected stock
   useEffect(() => {
-    if (!stockData || !stockData.symbol) return;
+    if (!stockData?.symbol) return;
     let isMounted = true;
-    const refreshSelectedStockPrice = async () => {
+
+    const refreshSelectedStock = async () => {
       try {
-        const updated = await fetchStockPrice(stockData.symbol);
+        const priceData = await fetchStockPrice(stockData.symbol);
         if (!isMounted) return;
-        setStockData((prev) => (prev ? { ...prev, ...updated } : prev));
-      } catch (e) {
-        // Optionally handle error
+
+        setStockData((prev) => ({
+          ...prev,
+          price: priceData.price,
+          change: priceData.change,
+          changePercent: priceData.changePercent,
+          timestamp: priceData.timestamp,
+        }));
+      } catch (error) {
+        console.error("Error refreshing selected stock:", error);
       }
     };
-    const interval = setInterval(refreshSelectedStockPrice, 60000);
-    // Initial refresh
-    refreshSelectedStockPrice();
+
+    const interval = setInterval(refreshSelectedStock, 60000);
+
     return () => {
       isMounted = false;
       clearInterval(interval);
     };
   }, [stockData?.symbol]);
 
-  // Periodically refresh prices for all stocks in the portfolio every minute
-  useEffect(() => {
-    if (!portfolio || portfolio.length === 0) return;
-    let isMounted = true;
-    const refreshPortfolioPrices = async () => {
-      // Deduplicate symbols
-      const uniqueSymbols = [
-        ...new Set(portfolio.map((stock) => stock.symbol)),
-      ];
-      const priceMap = {};
-      await Promise.all(
-        uniqueSymbols.map(async (symbol) => {
-          priceMap[symbol] = await fetchStockPrice(symbol);
-        })
-      );
-      if (!isMounted) return;
-      setPortfolio((prev) =>
-        prev.map((stock) => {
-          const priceData = priceMap[stock.symbol];
-          if (priceData) {
-            return {
-              ...stock,
-              currentPrice: priceData.price,
-              totalValue: priceData.price * stock.quantity,
-              profitLoss:
-                (priceData.price - stock.purchasePrice) * stock.quantity,
-              profitLossPercentage:
-                ((priceData.price - stock.purchasePrice) /
-                  stock.purchasePrice) *
-                100,
-            };
-          } else {
-            return stock;
-          }
-        })
-      );
-    };
-    const interval = setInterval(refreshPortfolioPrices, 60000);
-    // Initial refresh
-    refreshPortfolioPrices();
-    return () => {
-      isMounted = false;
-      clearInterval(interval);
-    };
-  }, [portfolio.length]);
-
   return (
-    <Container maxW="container.lg" py={10}>
-      <VStack spacing={8}>
-        <Heading
-          color="uoft.navy"
-          fontSize={{ base: "2xl", md: "4xl" }}
-          fontWeight="extrabold"
+    <Box minH="100vh" bg={pageBgColor} py={8}>
+      <Container maxW="container.xl">
+        {/* Header with Balance */}
+        <Flex
+          direction={{ base: "column", md: "row" }}
+          justify="space-between"
+          align="center"
+          mb={8}
+          gap={4}
         >
-          Stock Trading
-        </Heading>
+          <VStack align="start" spacing={1}>
+            <Heading size="lg" color={mainTextColor}>
+              Stock Trading
+            </Heading>
+            <Text color={subTextColor}>Live market trading simulation</Text>
+          </VStack>
+          <Box bg={cardBgColor} p={4} borderRadius="lg" boxShadow={cardShadow}>
+            <HStack spacing={8} align="end">
+              {/* Available Balance */}
+              <VStack align="end" spacing={1}>
+                <Text color={subTextColor} fontSize="sm">
+                  Available Balance
+                </Text>
+                <Text color={mainTextColor} fontSize="2xl" fontWeight="bold">
+                  {userData ? (
+                    `$${userData.balance?.toLocaleString(undefined, {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2,
+                    })}`
+                  ) : (
+                    <Skeleton height="1.5rem" width="150px" />
+                  )}
+                </Text>
+              </VStack>
 
-        {/* Show user balance */}
-        <Box w="100%" textAlign="right">
-          <Stat>
-            <StatLabel color="gray.600">Cash Balance</StatLabel>
-            <StatNumber color="uoft.navy">
-              {userData ? (
-                `$${userData.balance?.toLocaleString(undefined, {
-                  minimumFractionDigits: 2,
-                  maximumFractionDigits: 2,
-                })}`
-              ) : (
-                <Skeleton height="20px" />
-              )}
-            </StatNumber>
-          </Stat>
-        </Box>
+              {/* Portfolio Value */}
+              <VStack align="end" spacing={1}>
+                <Text color={subTextColor} fontSize="sm">
+                  Portfolio Value
+                </Text>
+                <Text color={mainTextColor} fontSize="2xl" fontWeight="bold">
+                  {portfolio.length > 0
+                    ? `$${portfolio
+                        .reduce(
+                          (total, stock) =>
+                            total + stock.currentPrice * stock.quantity,
+                          0
+                        )
+                        .toLocaleString(undefined, {
+                          minimumFractionDigits: 2,
+                          maximumFractionDigits: 2,
+                        })}`
+                    : "$0.00"}
+                </Text>
+              </VStack>
+            </HStack>
+          </Box>
+        </Flex>
 
-        {apiCallsRemaining < API_CALL_LIMIT && (
-          <Alert status="info" borderRadius="md">
-            <AlertIcon />
-            <VStack align="start" spacing={2} flex="1">
-              <Text>
-                API Calls Remaining: {apiCallsRemaining} of {API_CALL_LIMIT}
-              </Text>
-              {cooldownTime > 0 && (
-                <>
-                  <Text>Resets in: {cooldownTime} seconds</Text>
-                  <Progress
-                    value={(60 - cooldownTime) * (100 / 60)}
-                    size="sm"
-                    width="100%"
-                    colorScheme="uoft"
-                  />
-                </>
-              )}
-            </VStack>
-          </Alert>
-        )}
-
-        <Tabs width="100%" colorScheme="uoft">
-          <TabList>
-            <Tab _selected={{ color: "uoft.navy", borderColor: "uoft.navy" }}>
-              Trade
-            </Tab>
-            <Tab _selected={{ color: "uoft.navy", borderColor: "uoft.navy" }}>
-              Portfolio
-            </Tab>
-          </TabList>
-
-          <TabPanels>
-            <TabPanel>
-              <VStack spacing={6}>
-                <InputGroup size="lg">
-                  <Input
-                    placeholder="Enter stock symbol (e.g., NVDA)"
-                    value={symbol}
-                    onChange={(e) => setSymbol(e.target.value.toUpperCase())}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") {
-                        searchStock();
-                      }
-                    }}
-                    _focus={{
-                      borderColor: "uoft.navy",
-                      boxShadow: "0 0 0 1px uoft.navy",
-                    }}
-                  />
-                  <InputRightElement width="4.5rem">
-                    <Button
-                      h="1.75rem"
-                      size="sm"
-                      onClick={searchStock}
-                      isLoading={loading}
-                    >
-                      <SearchIcon />
-                    </Button>
-                  </InputRightElement>
-                </InputGroup>
-
-                {stockData && (
-                  <Box
-                    p={8}
-                    borderRadius="2xl"
-                    boxShadow="2xl"
-                    bgGradient="linear(to-br, white, blue.50)"
-                    border="2px solid"
-                    borderColor="uoft.navy"
-                    width="100%"
-                    _hover={{
-                      borderColor: "blue.400",
-                      boxShadow: "3xl",
-                    }}
-                  >
-                    <VStack spacing={6} align="stretch">
-                      <Stat textAlign="center">
-                        <StatLabel fontSize="2xl" color="gray.600">
-                          {stockData.symbol}
-                        </StatLabel>
-                        <StatNumber fontSize="4xl" color="uoft.navy">
-                          ${stockData.price.toFixed(2)}
-                        </StatNumber>
-                        <StatHelpText>
-                          <StatArrow
-                            type={
-                              stockData.change > 0 ? "increase" : "decrease"
-                            }
-                          />
-                          {Math.abs(stockData.changePercent).toFixed(2)}%
-                        </StatHelpText>
-                      </Stat>
-                      <NumberInput
-                        value={quantity}
-                        min={1}
-                        onChange={(value) => setQuantity(Number(value))}
-                        size="lg"
-                        width="50%"
-                        mx="auto"
-                      >
-                        <NumberInputField
-                          _focus={{
-                            borderColor: "uoft.navy",
-                            boxShadow: "0 0 0 1px uoft.navy",
-                          }}
-                        />
-                        <NumberInputStepper>
-                          <NumberIncrementStepper />
-                          <NumberDecrementStepper />
-                        </NumberInputStepper>
-                      </NumberInput>
-                      <Text
-                        fontSize="xl"
-                        fontWeight="bold"
-                        color="uoft.navy"
-                        textAlign="center"
-                      >
-                        Total: ${(stockData.price * quantity).toFixed(2)}
-                      </Text>
+        {/* Main Content */}
+        <Flex gap={8} direction={{ base: "column", xl: "row" }}>
+          {/* Left Panel - Trading Interface */}
+          <Box flex={1}>
+            <VStack spacing={6} align="stretch">
+              {/* Search Bar */}
+              <Box
+                bg={cardBgColor}
+                p={6}
+                borderRadius="lg"
+                boxShadow={cardShadow}
+              >
+                <VStack spacing={4}>
+                  <InputGroup size="lg">
+                    <Input
+                      placeholder="Search stock symbol (NVDA)"
+                      value={symbol}
+                      onChange={(e) => setSymbol(e.target.value.toUpperCase())}
+                      bg={useColorModeValue("white", "gray.700")}
+                      color={mainTextColor}
+                      borderRadius="md"
+                      fontSize="lg"
+                      textTransform="uppercase"
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          searchStock();
+                        }
+                      }}
+                    />
+                    <InputRightElement width="5.5rem" pr={1}>
                       <Button
-                        width="100%"
-                        size="lg"
+                        size="sm"
                         colorScheme="blue"
-                        onClick={() => handleTrade("buy")}
-                        _hover={{
-                          bg: "uoft.lightBlue",
-                          boxShadow: "xl",
-                        }}
-                        fontWeight="extrabold"
-                        borderRadius="full"
-                        isDisabled={!marketOpen}
+                        isLoading={loading}
+                        onClick={searchStock}
                       >
-                        Buy
+                        Search
                       </Button>
-                      {!marketOpen && (
-                        <Text
-                          color="red.500"
-                          fontWeight="bold"
-                          textAlign="center"
-                        >
-                          Market is closed. Trading is only allowed Monday
-                          through Friday, 9:30am to 4:00pm Eastern Time.
+                    </InputRightElement>
+                  </InputGroup>
+                </VStack>
+              </Box>
+
+              {/* Stock Info & Trading Panel */}
+              {stockData && (
+                <Box
+                  bg={cardBgColor}
+                  borderRadius="lg"
+                  boxShadow={cardShadow}
+                  overflow="hidden"
+                >
+                  {/* Stock Header */}
+                  <Box
+                    p={6}
+                    borderBottom="1px"
+                    borderColor={borderColor}
+                    bg={stockHeaderBg}
+                  >
+                    <Flex justify="space-between" align="center">
+                      <VStack align="start" spacing={1}>
+                        <HStack>
+                          <Text
+                            fontSize="2xl"
+                            fontWeight="bold"
+                            color={mainTextColor}
+                          >
+                            {stockData.symbol}
+                          </Text>
+                          <Badge
+                            colorScheme={
+                              stockData.change >= 0 ? "green" : "red"
+                            }
+                            fontSize="md"
+                            px={2}
+                            py={0.5}
+                            borderRadius="md"
+                          >
+                            {stockData.change >= 0 ? "+" : ""}
+                            {stockData.changePercent.toFixed(2)}%
+                          </Badge>
+                        </HStack>
+                        <Text fontSize="sm" color={subTextColor}>
+                          Last Updated: {new Date().toLocaleTimeString()}
                         </Text>
+                      </VStack>
+                      <Text
+                        fontSize="3xl"
+                        fontWeight="bold"
+                        color={mainTextColor}
+                      >
+                        ${stockData.price.toFixed(2)}
+                      </Text>
+                    </Flex>
+                  </Box>
+
+                  {/* Trading Controls */}
+                  <Box p={6}>
+                    <VStack spacing={6}>
+                      {/* Market Status */}
+                      <HStack
+                        w="100%"
+                        p={3}
+                        bg={tradingControlsBg}
+                        borderRadius="md"
+                        justify="center"
+                      >
+                        <Box
+                          w={2}
+                          h={2}
+                          borderRadius="full"
+                          bg={isMarketOpen() ? "green.400" : "red.400"}
+                        />
+                        <Text color={subTextColor} fontSize="sm">
+                          Market {isMarketOpen() ? "Open" : "Closed"}
+                        </Text>
+                      </HStack>
+
+                      {/* Trade Form */}
+                      <HStack w="100%" spacing={4}>
+                        <Box flex={1}>
+                          <Text mb={2} color={subTextColor} fontSize="sm">
+                            Quantity
+                          </Text>
+                          <NumberInput
+                            value={quantity}
+                            min={1}
+                            onChange={(value) => setQuantity(Number(value))}
+                            size="lg"
+                          >
+                            <NumberInputField bg={numberInputBg} />
+                            <NumberInputStepper>
+                              <NumberIncrementStepper />
+                              <NumberDecrementStepper />
+                            </NumberInputStepper>
+                          </NumberInput>
+                        </Box>
+                        <Box flex={1}>
+                          <Text mb={2} color={subTextColor} fontSize="sm">
+                            Total Cost
+                          </Text>
+                          <Text
+                            p={4}
+                            bg={numberInputBg}
+                            borderRadius="md"
+                            fontSize="lg"
+                            fontWeight="bold"
+                            color={mainTextColor}
+                          >
+                            ${(stockData.price * quantity).toFixed(2)}
+                          </Text>
+                        </Box>
+                      </HStack>
+
+                      {/* Action Buttons */}
+                      <HStack w="100%" spacing={4}>
+                        <Button
+                          flex={1}
+                          size="lg"
+                          colorScheme="green"
+                          onClick={() => handleTrade("buy")}
+                          isDisabled={!isMarketOpen()}
+                        >
+                          Buy {stockData.symbol}
+                        </Button>
+                      </HStack>
+
+                      {!isMarketOpen() && (
+                        <Alert status="warning" borderRadius="md">
+                          <AlertIcon />
+                          <Text fontSize="sm">
+                            Market is closed. Trading hours: Mon-Fri, 9:30 AM -
+                            4:00 PM ET
+                          </Text>
+                        </Alert>
                       )}
                     </VStack>
                   </Box>
-                )}
-              </VStack>
-            </TabPanel>
+                </Box>
+              )}
+            </VStack>
+          </Box>
 
-            <TabPanel>
-              <Box
-                p={6}
-                borderRadius="lg"
-                boxShadow="xl"
-                bg={bgColor}
-                border="1px"
-                borderColor={borderColor}
-                _hover={{
-                  borderColor: "uoft.navy",
-                }}
-              >
-                <Table variant="striped" colorScheme="blue">
-                  <Thead>
-                    <Tr>
-                      <Th color="uoft.navy">Symbol</Th>
-                      <Th isNumeric color="uoft.navy">
-                        Quantity
-                      </Th>
-                      <Th isNumeric color="uoft.navy">
-                        Purchase Price
-                      </Th>
-                      <Th isNumeric color="uoft.navy">
-                        Current Price
-                      </Th>
-                      <Th isNumeric color="uoft.navy">
-                        Total Value
-                      </Th>
-                      <Th isNumeric color="uoft.navy">
-                        P/L
-                      </Th>
-                      <Th></Th>
+          {/* Right Panel - Portfolio */}
+          <Box
+            flex={1}
+            bg={cardBgColor}
+            borderRadius="lg"
+            boxShadow={cardShadow}
+            height="fit-content"
+          >
+            <Box
+              p={4}
+              borderBottom="1px"
+              borderColor={borderColor}
+              bg={useColorModeValue("gray.50", "gray.700")}
+            >
+              <Heading size="md" color={mainTextColor}>
+                Your Portfolio
+              </Heading>
+            </Box>
+
+            {portfolio.length > 0 ? (
+              <Table variant="simple">
+                <Thead>
+                  <Tr>
+                    <Th>Symbol</Th>
+                    <Th isNumeric>Shares</Th>
+                    <Th isNumeric>Avg. Cost</Th>
+                    <Th isNumeric>Current</Th>
+                    <Th isNumeric>P/L</Th>
+                    <Th>Action</Th>
+                  </Tr>
+                </Thead>
+                <Tbody>
+                  {portfolio.map((stock) => (
+                    <Tr key={stock.id}>
+                      <Td fontWeight="bold" color={mainTextColor}>
+                        {stock.symbol}
+                      </Td>
+                      <Td isNumeric>{stock.quantity}</Td>
+                      <Td isNumeric>${stock.purchasePrice.toFixed(2)}</Td>
+                      <Td isNumeric>${stock.currentPrice.toFixed(2)}</Td>
+                      <Td isNumeric>
+                        <Text
+                          color={
+                            stock.profitLoss >= 0 ? "green.400" : "red.400"
+                          }
+                          fontWeight="bold"
+                        >
+                          {stock.profitLoss >= 0 ? "+" : ""}$
+                          {stock.profitLoss.toFixed(2)}
+                        </Text>
+                      </Td>
+                      <Td>
+                        <HStack spacing={2}>
+                          <NumberInput
+                            size="sm"
+                            min={1}
+                            max={stock.quantity}
+                            value={sellQuantities[stock.id] || 1}
+                            onChange={(value) => {
+                              const numValue = Number(value);
+                              setSellQuantities((prev) => ({
+                                ...prev,
+                                [stock.id]: Math.min(
+                                  Math.max(1, numValue),
+                                  stock.quantity
+                                ),
+                              }));
+                            }}
+                            width="80px"
+                          >
+                            <NumberInputField />
+                            <NumberInputStepper>
+                              <NumberIncrementStepper />
+                              <NumberDecrementStepper />
+                            </NumberInputStepper>
+                          </NumberInput>
+                          <Button
+                            size="sm"
+                            colorScheme="red"
+                            onClick={() =>
+                              handleSell(stock, sellQuantities[stock.id] || 1)
+                            }
+                            isDisabled={!isMarketOpen()}
+                          >
+                            Sell
+                          </Button>
+                        </HStack>
+                      </Td>
                     </Tr>
-                  </Thead>
-                  <Tbody>
-                    {loadingPortfolio ? (
-                      <Tr>
-                        <Td colSpan={7}>
-                          <Skeleton height="20px" />
-                        </Td>
-                      </Tr>
-                    ) : (
-                      portfolio.map((stock) => (
-                        <Tr key={stock.id}>
-                          <Td fontWeight="bold">{stock.symbol}</Td>
-                          <Td isNumeric>{stock.quantity}</Td>
-                          <Td isNumeric>${stock.purchasePrice.toFixed(2)}</Td>
-                          <Td isNumeric>${stock.currentPrice.toFixed(2)}</Td>
-                          <Td isNumeric>${stock.totalValue.toFixed(2)}</Td>
-                          <Td isNumeric>
-                            <Badge
-                              colorScheme={
-                                stock.profitLoss >= 0 ? "green" : "red"
-                              }
-                            >
-                              {stock.profitLoss >= 0 ? "+" : "-"}$
-                              {Math.abs(stock.profitLoss).toFixed(2)}
-                            </Badge>
-                          </Td>
-                          <Td>
-                            <NumberInput
-                              size="sm"
-                              min={1}
-                              max={stock.quantity}
-                              value={
-                                stock.quantity === 1
-                                  ? 1
-                                  : sellQuantities[stock.id] &&
-                                    sellQuantities[stock.id] >= 1
-                                  ? sellQuantities[stock.id]
-                                  : 1
-                              }
-                              onChange={(valueString, valueNumber) => {
-                                let value = Number(valueString);
-                                if (isNaN(value) || value < 1) value = 1;
-                                if (value > stock.quantity)
-                                  value = stock.quantity;
-                                setSellQuantities((prev) => ({
-                                  ...prev,
-                                  [stock.id]: value,
-                                }));
-                              }}
-                              clampValueOnBlur={true}
-                              width="80px"
-                              readOnly={stock.quantity === 1}
-                            >
-                              <NumberInputField />
-                              <NumberInputStepper>
-                                <NumberIncrementStepper />
-                                <NumberDecrementStepper />
-                              </NumberInputStepper>
-                            </NumberInput>
-                            <Button
-                              size="sm"
-                              ml={2}
-                              onClick={() =>
-                                handleSell(
-                                  stock,
-                                  stock.quantity === 1
-                                    ? 1
-                                    : sellQuantities[stock.id] || 1
-                                )
-                              }
-                              variant="outline"
-                              _hover={{
-                                bg: "red.500",
-                                color: "white",
-                                borderColor: "red.500",
-                              }}
-                            >
-                              Sell
-                            </Button>
-                          </Td>
-                        </Tr>
-                      ))
-                    )}
-                  </Tbody>
-                </Table>
+                  ))}
+                </Tbody>
+              </Table>
+            ) : (
+              <Box p={8} textAlign="center">
+                <Text color={subTextColor}>
+                  Your portfolio is empty. Start trading to build your
+                  portfolio!
+                </Text>
               </Box>
-            </TabPanel>
-          </TabPanels>
-        </Tabs>
-      </VStack>
-    </Container>
+            )}
+          </Box>
+        </Flex>
+      </Container>
+    </Box>
   );
 }
 

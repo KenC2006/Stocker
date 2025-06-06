@@ -26,6 +26,7 @@ import {
   ModalBody,
   ModalFooter,
   IconButton,
+  HStack,
 } from "@chakra-ui/react";
 import { Link } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
@@ -35,6 +36,8 @@ import {
   FaUserCircle,
   FaArrowRight,
   FaQuestionCircle,
+  FaWallet,
+  FaDollarSign,
 } from "react-icons/fa";
 import {
   doc,
@@ -43,13 +46,12 @@ import {
   query,
   where,
   getDocs,
+  updateDoc,
+  serverTimestamp,
 } from "firebase/firestore";
 import { db } from "../config/firebase";
+import { fetchStockPrice, fetchStockPrices } from "../services/stockService";
 import axios from "axios";
-
-// Cache for storing stock prices
-const priceCache = new Map();
-const CACHE_DURATION = 60000; // 1 minute cache
 
 function Dashboard() {
   const { currentUser } = useAuth();
@@ -69,165 +71,135 @@ function Dashboard() {
     onOpen: onAboutOpen,
     onClose: onAboutClose,
   } = useDisclosure();
+  const mainTextColor = useColorModeValue("uoft.navy", "white");
+  const subTextColor = useColorModeValue("gray.600", "gray.200");
+  const pageBgColor = useColorModeValue("gray.50", "gray.900");
+  const iconColor = useColorModeValue("blue.500", "blue.200");
 
-  const getCachedPrice = (stockSymbol) => {
-    const cached = priceCache.get(stockSymbol);
-    if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
-      return cached.data;
-    }
-    return null;
-  };
-
-  const fetchStockPrice = async (symbol) => {
-    try {
-      // Use Finnhub API (replace with your actual API key)
-      const response = await axios.get("https://finnhub.io/api/v1/quote", {
-        params: {
-          symbol,
-          token: "d0vg651r01qkepd02btgd0vg651r01qkepd02bu0", // <-- your Finnhub API key
-        },
-      });
-      const data = response.data;
-      if (!data || data.c === 0) {
-        throw new Error(`Symbol '${symbol}' not found.`);
-      }
+  const calculatePortfolioStats = async (userStocks, cash = 0) => {
+    if (!userStocks.length) {
       return {
-        price: data.c,
-        change: data.c - data.pc,
-        changePercent: ((data.c - data.pc) / data.pc) * 100,
+        portfolioValue: 0,
+        totalValue: cash,
+        percentageChange: 0,
       };
-    } catch (error) {
-      console.error("Finnhub API error:", error.message);
-      return null;
     }
-  };
 
-  const calculatePortfolioValue = async (stocks, cash = 0) => {
+    const symbols = userStocks.map((stock) => stock.symbol);
+    const priceMap = await fetchStockPrices(symbols);
+
     let portfolioValue = 0;
     let initialValue = 0;
-    // Deduplicate symbols
-    const uniqueSymbols = [...new Set(stocks.map((stock) => stock.symbol))];
-    // Fetch prices for unique symbols only
-    const priceMap = {};
-    await Promise.all(
-      uniqueSymbols.map(async (symbol) => {
-        priceMap[symbol] = await fetchStockPrice(symbol);
-      })
-    );
-    stocks.forEach((stock) => {
+
+    userStocks.forEach((stock) => {
       const priceData = priceMap[stock.symbol];
       if (priceData) {
         portfolioValue += priceData.price * stock.quantity;
         initialValue += stock.purchasePrice * stock.quantity;
       }
     });
-    const initialInvestment = 30000; // or userData.initialInvestment
-    const totalValue = cash + portfolioValue;
+
+    const totalValue = portfolioValue + cash;
+    const initialInvestment = 30000;
     const gainLoss = totalValue - initialInvestment;
-    const gainLossPercent = (gainLoss / initialInvestment) * 100;
+    const percentageChange =
+      initialInvestment > 0 ? (gainLoss / initialInvestment) * 100 : 0;
+
     return {
       portfolioValue,
-      initialValue,
       totalValue,
-      percentageChange:
-        initialValue > 0
-          ? ((portfolioValue - initialValue) / initialValue) * 100
-          : 0,
+      percentageChange,
+      gainLoss,
+      gainLossPercent: percentageChange,
     };
   };
 
   const fetchUserRank = async (userTotalValue) => {
     try {
-      const usersSnapshot = await getDocs(collection(db, "users"));
-      const stocksSnapshot = await getDocs(collection(db, "stocks"));
-      // Group stocks by userId
-      const stocksByUser = {};
-      stocksSnapshot.forEach((doc) => {
-        const stock = doc.data();
-        if (!stocksByUser[stock.userId]) {
-          stocksByUser[stock.userId] = [];
-        }
-        stocksByUser[stock.userId].push(stock);
-      });
-      // Collect all unique symbols across all users
-      const allStocks = stocksSnapshot.docs.map((doc) => doc.data());
-      const uniqueSymbols = [
-        ...new Set(allStocks.map((stock) => stock.symbol)),
-      ];
-      // Fetch prices for all unique symbols only once
-      const priceMap = {};
-      await Promise.all(
-        uniqueSymbols.map(async (symbol) => {
-          priceMap[symbol] = await fetchStockPrice(symbol);
-        })
+      // Get all users with minimal fields
+      const usersSnapshot = await getDocs(
+        query(
+          collection(db, "users"),
+          // Only fetch necessary fields
+          where("totalValue", ">=", 0)
+        )
       );
-      // Calculate total value for each user
-      const userValues = [];
-      for (const userDoc of usersSnapshot.docs) {
-        const userData = userDoc.data();
-        const userStocks = stocksByUser[userDoc.id] || [];
-        let portfolioValue = 0;
-        let initialValue = 0;
-        userStocks.forEach((stock) => {
-          const priceData = priceMap[stock.symbol];
-          if (priceData) {
-            portfolioValue += priceData.price * stock.quantity;
-            initialValue += stock.purchasePrice * stock.quantity;
-          }
-        });
-        const cash = userData.balance || 0;
-        const initialInvestment = 30000;
-        const totalValue = cash + portfolioValue;
-        userValues.push(totalValue);
-      }
-      userValues.sort((a, b) => b - a);
-      const rank = userValues.indexOf(userTotalValue) + 1;
-      return {
-        rank,
-        totalUsers: userValues.length,
+
+      const allUsers = usersSnapshot.docs.map((doc) => ({
+        id: doc.id,
+        totalValue: doc.data().totalValue || 0,
+      }));
+
+      allUsers.sort((a, b) => b.totalValue - a.totalValue);
+      const rank =
+        allUsers.findIndex((user) => user.id === currentUser.uid) + 1;
+      const rankData = {
+        rank: rank || allUsers.length,
+        totalUsers: allUsers.length,
       };
+
+      return rankData;
     } catch (error) {
       console.error("Error calculating rank:", error);
       return { rank: 0, totalUsers: 0 };
     }
   };
 
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        // Fetch user data
-        const userDoc = await getDoc(doc(db, "users", currentUser.uid));
-        let cash = 0;
-        if (userDoc.exists()) {
-          setUserData(userDoc.data());
-          cash = userDoc.data().balance || 0;
-        }
-        // Fetch user's stocks
-        const stocksQuery = query(
-          collection(db, "stocks"),
-          where("userId", "==", currentUser.uid)
-        );
-        const stocksSnapshot = await getDocs(stocksQuery);
-        const userStocks = stocksSnapshot.docs.map((doc) => doc.data());
-        // Calculate portfolio value (stocks only)
-        const { portfolioValue, initialValue, totalValue, percentageChange } =
-          await calculatePortfolioValue(userStocks, cash);
-        // Calculate user's rank
-        const { rank, totalUsers } = await fetchUserRank(totalValue);
-        setPortfolioStats({
-          portfolioValue,
-          totalValue,
-          percentageChange,
-          rank,
-          totalUsers,
-          cash,
+  const fetchData = async () => {
+    if (!currentUser) return;
+
+    setLoading(true);
+    try {
+      // Fetch user data and stocks in parallel
+      const [userDoc, stocksSnapshot] = await Promise.all([
+        getDoc(doc(db, "users", currentUser.uid)),
+        getDocs(
+          query(
+            collection(db, "stocks"),
+            where("userId", "==", currentUser.uid)
+          )
+        ),
+      ]);
+
+      const userData = userDoc.exists() ? userDoc.data() : null;
+      const cash = userData?.balance || 0;
+      setUserData(userData);
+
+      const userStocks = stocksSnapshot.docs.map((doc) => doc.data());
+
+      // Calculate portfolio stats and fetch rank in parallel
+      const [stats, rankData] = await Promise.all([
+        calculatePortfolioStats(userStocks, cash),
+        fetchUserRank(userData?.totalValue || 0),
+      ]);
+
+      setPortfolioStats({
+        ...stats,
+        ...rankData,
+        cash,
+      });
+
+      // Update user document with new values if they've changed significantly
+      const shouldUpdate =
+        Math.abs(stats.totalValue - (userData?.totalValue || 0)) > 1;
+      if (shouldUpdate) {
+        await updateDoc(doc(db, "users", currentUser.uid), {
+          portfolioValue: stats.portfolioValue,
+          totalValue: stats.totalValue,
+          gainLoss: stats.gainLoss,
+          gainLossPercent: stats.gainLossPercent,
+          initialInvestment: 30000,
+          lastUpdate: serverTimestamp(),
         });
-      } catch (error) {
-        console.error("Error fetching data:", error);
-      } finally {
-        setLoading(false);
       }
-    };
+    } catch (error) {
+      console.error("Error fetching data:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
     if (currentUser) {
       fetchData();
     }
@@ -235,80 +207,98 @@ function Dashboard() {
 
   const stats = [
     {
-      label: "Portfolio Value (Stocks)",
-      value: userData ? (
+      label: "Portfolio Value",
+      value: loading ? (
+        <Skeleton height="20px" />
+      ) : (
         `$${
           portfolioStats.portfolioValue?.toLocaleString(undefined, {
             minimumFractionDigits: 2,
             maximumFractionDigits: 2,
           }) || "0.00"
         }`
-      ) : (
-        <Skeleton height="20px" />
       ),
       change: portfolioStats.percentageChange,
       icon: FaChartLine,
+      helpText:
+        portfolioStats.percentageChange >= 0
+          ? `+${portfolioStats.percentageChange.toFixed(2)}%`
+          : `${portfolioStats.percentageChange.toFixed(2)}%`,
     },
     {
       label: "Cash Balance",
-      value: userData ? (
-        `$${userData.balance?.toLocaleString(undefined, {
+      value: loading ? (
+        <Skeleton height="20px" />
+      ) : (
+        `$${(portfolioStats.cash || 0).toLocaleString(undefined, {
           minimumFractionDigits: 2,
           maximumFractionDigits: 2,
         })}`
-      ) : (
-        <Skeleton height="20px" />
       ),
-      icon: FaUserCircle,
+      icon: FaWallet,
     },
     {
-      label: "Total Value (Cash + Stocks)",
-      value: userData ? (
+      label: "Total Value",
+      value: loading ? (
+        <Skeleton height="20px" />
+      ) : (
         `$${
           portfolioStats.totalValue?.toLocaleString(undefined, {
             minimumFractionDigits: 2,
             maximumFractionDigits: 2,
           }) || "0.00"
         }`
-      ) : (
-        <Skeleton height="20px" />
       ),
-      icon: FaTrophy,
+      icon: FaDollarSign,
     },
     {
       label: "Current Rank",
-      value: `#${portfolioStats.rank}`,
+      value: loading ? (
+        <Skeleton height="20px" />
+      ) : portfolioStats.rank === 0 ? (
+        "Not Ranked"
+      ) : (
+        `#${portfolioStats.rank}`
+      ),
       helpText:
-        portfolioStats.totalUsers > 0
-          ? `Top ${(
-              (portfolioStats.rank / portfolioStats.totalUsers) *
+        loading || !portfolioStats.totalUsers
+          ? "Calculating rank..."
+          : portfolioStats.rank === 0
+          ? "No active trades yet"
+          : `Top ${Math.min(
+              Math.ceil(
+                (portfolioStats.rank / portfolioStats.totalUsers) * 100
+              ),
               100
-            ).toFixed(0)}%`
-          : "No ranking",
+            )}%`,
       icon: FaTrophy,
     },
     {
       label: "Active Since",
-      value: new Date(userData?.createdAt || Date.now()).toLocaleDateString(),
+      value: loading ? (
+        <Skeleton height="20px" />
+      ) : (
+        new Date(userData?.createdAt || Date.now()).toLocaleDateString()
+      ),
       helpText: "Trading Account",
       icon: FaUserCircle,
     },
   ];
 
   return (
-    <Box position="relative">
+    <Box position="relative" minH="100vh" bg={pageBgColor}>
       <Container maxW="container.lg" py={10}>
         <VStack spacing={8} align="stretch">
           <Box textAlign="center" mb={8}>
             <Heading
-              color="uoft.navy"
+              color={mainTextColor}
               fontSize={{ base: "2xl", md: "4xl" }}
               fontWeight="extrabold"
             >
               Welcome Back
               {userData ? `, ${userData.firstName}` : ""}
             </Heading>
-            <Text mt={2} color="gray.600">
+            <Text mt={2} color={subTextColor}>
               Track your portfolio performance and market trends
             </Text>
           </Box>
@@ -331,15 +321,15 @@ function Dashboard() {
                 }}
               >
                 <VStack spacing={3} align="stretch">
-                  <Icon as={stat.icon} w={6} h={6} color="uoft.navy" />
+                  <Icon as={stat.icon} w={6} h={6} color={iconColor} />
                   <Stat>
-                    <StatLabel fontSize="sm" color="gray.600">
+                    <StatLabel fontSize="sm" color={subTextColor}>
                       {stat.label}
                     </StatLabel>
                     <StatNumber
                       fontSize="2xl"
                       fontWeight="bold"
-                      color="uoft.navy"
+                      color={mainTextColor}
                     >
                       {loading ? <Skeleton height="20px" /> : stat.value}
                     </StatNumber>
@@ -369,10 +359,10 @@ function Dashboard() {
               alignItems="center"
               justifyContent="center"
             >
-              <Heading size="md" color="uoft.navy" mb={2}>
+              <Heading size="md" color={mainTextColor} mb={2}>
                 Contest Info
               </Heading>
-              <Text color="gray.600" mb={4} textAlign="center">
+              <Text color={subTextColor} mb={4} textAlign="center">
                 Learn more about the current trading contest, rules, and prizes.
               </Text>
               <Button
@@ -399,10 +389,10 @@ function Dashboard() {
             }}
           >
             <VStack spacing={4}>
-              <Heading size="md" color="uoft.navy">
+              <Heading size="md" color={mainTextColor}>
                 Ready to Trade?
               </Heading>
-              <Text color="gray.600">
+              <Text color={subTextColor}>
                 Start trading stocks and build your portfolio
               </Text>
               <Button
@@ -429,70 +419,227 @@ function Dashboard() {
             </VStack>
           </Box>
           {/* Contest Info Modal */}
-          <Modal isOpen={isOpen} onClose={onClose} isCentered size="lg">
-            <ModalOverlay />
-            <ModalContent borderRadius="2xl" boxShadow="2xl" bg={bgColor}>
+          <Modal
+            isOpen={isOpen}
+            onClose={onClose}
+            isCentered
+            size="xl"
+            motionPreset="slideInBottom"
+          >
+            <ModalOverlay backdropFilter="blur(10px)" bg="blackAlpha.600" />
+            <ModalContent
+              borderRadius="2xl"
+              boxShadow="2xl"
+              bg={bgColor}
+              p={6}
+              mx={4}
+              bgGradient={useColorModeValue(
+                "linear(to-br, white, blue.50)",
+                "linear(to-br, gray.800, blue.900)"
+              )}
+            >
               <ModalHeader
-                color="uoft.navy"
-                fontWeight="bold"
-                fontSize="2xl"
+                color={mainTextColor}
+                fontWeight="extrabold"
+                fontSize="3xl"
                 textAlign="center"
+                pb={2}
+                bgGradient={useColorModeValue(
+                  "linear(to-r, blue.600, purple.600)",
+                  "linear(to-r, blue.200, purple.200)"
+                )}
+                bgClip="text"
               >
-                Contest Information
+                🏆 Trading Contest
               </ModalHeader>
-              <ModalCloseButton />
+              <ModalCloseButton size="lg" color={mainTextColor} />
               <ModalBody>
-                <VStack spacing={4} align="stretch">
-                  <Text fontSize="lg" color="gray.700">
+                <VStack spacing={6} align="stretch">
+                  <Text
+                    fontSize="lg"
+                    color={mainTextColor}
+                    textAlign="center"
+                    fontWeight="medium"
+                    lineHeight="tall"
+                  >
                     Welcome to the UofT Stocker Trading Contest! Compete with
                     fellow students to grow your virtual portfolio and climb the
                     leaderboard.
                   </Text>
+
+                  {/* Rules Section */}
                   <Box
                     bg="uoft.navy"
                     color="white"
-                    p={4}
-                    borderRadius="lg"
-                    boxShadow="md"
+                    p={6}
+                    borderRadius="2xl"
+                    boxShadow="lg"
+                    position="relative"
+                    overflow="hidden"
+                    _before={{
+                      content: '""',
+                      position: "absolute",
+                      top: "-50%",
+                      left: "-50%",
+                      width: "200%",
+                      height: "200%",
+                      backgroundImage:
+                        "radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 60%)",
+                      opacity: 0.5,
+                    }}
                   >
-                    <Text fontWeight="bold">Contest Rules:</Text>
-                    <ul style={{ marginLeft: 20 }}>
-                      <li>Start with $30,000 in virtual cash.</li>
-                      <li>Buy and sell real stocks with live prices.</li>
-                      <li>Top traders win prizes at the end of the contest.</li>
-                      <li>
-                        No real money is involved—it's all for fun and learning!
-                      </li>
-                    </ul>
+                    <HStack spacing={3} mb={4}>
+                      <Icon as={FaChartLine} w={6} h={6} />
+                      <Text fontWeight="bold" fontSize="xl">
+                        Rules
+                      </Text>
+                    </HStack>
+                    <VStack align="stretch" spacing={3} position="relative">
+                      <HStack spacing={4}>
+                        <Box w={1} h={6} bg="blue.300" borderRadius="full" />
+                        <Text>Start with $30,000 in virtual cash</Text>
+                      </HStack>
+                      <HStack spacing={4}>
+                        <Box w={1} h={6} bg="blue.300" borderRadius="full" />
+                        <Text>Buy and sell real stocks with live prices</Text>
+                      </HStack>
+                      <HStack spacing={4}>
+                        <Box w={1} h={6} bg="blue.300" borderRadius="full" />
+                        <Text>
+                          Top traders win prizes at the end of the contest
+                        </Text>
+                      </HStack>
+                      <HStack spacing={4}>
+                        <Box w={1} h={6} bg="blue.300" borderRadius="full" />
+                        <Text>
+                          No real money is involved—it's all for fun and
+                          learning!
+                        </Text>
+                      </HStack>
+                    </VStack>
                   </Box>
+
+                  {/* Prizes Section */}
                   <Box
                     bg="uoft.lightBlue"
-                    color="uoft.navy"
-                    p={4}
-                    borderRadius="lg"
-                    boxShadow="md"
+                    color="white"
+                    p={6}
+                    borderRadius="2xl"
+                    boxShadow="lg"
+                    position="relative"
+                    overflow="hidden"
+                    _before={{
+                      content: '""',
+                      position: "absolute",
+                      top: "-50%",
+                      left: "-50%",
+                      width: "200%",
+                      height: "200%",
+                      backgroundImage:
+                        "radial-gradient(circle, rgba(255,255,255,0.2) 0%, transparent 60%)",
+                      opacity: 0.5,
+                    }}
                   >
-                    <Text fontWeight="bold">Prizes:</Text>
-                    <ul style={{ marginLeft: 20 }}>
-                      <li>1st Place: $200 Amazon Gift Card</li>
-                      <li>2nd Place: $100 Amazon Gift Card</li>
-                      <li>3rd Place: $50 Amazon Gift Card</li>
-                    </ul>
+                    <HStack spacing={3} mb={4}>
+                      <Icon as={FaTrophy} w={6} h={6} />
+                      <Text fontWeight="bold" fontSize="xl">
+                        Prizes
+                      </Text>
+                    </HStack>
+                    <VStack align="stretch" spacing={6}>
+                      <HStack
+                        spacing={4}
+                        p={4}
+                        bg="whiteAlpha.200"
+                        borderRadius="xl"
+                        _hover={{
+                          transform: "translateY(-2px)",
+                          boxShadow: "lg",
+                        }}
+                        transition="all 0.2s"
+                      >
+                        <Icon as={FaTrophy} color="yellow.300" w={8} h={8} />
+                        <VStack align="start" spacing={0}>
+                          <Text fontWeight="bold" fontSize="lg">
+                            1st Place
+                          </Text>
+                          <Text fontSize="xl" fontWeight="extrabold">
+                            $200 Amazon Gift Card
+                          </Text>
+                        </VStack>
+                      </HStack>
+                      <HStack
+                        spacing={4}
+                        p={4}
+                        bg="whiteAlpha.200"
+                        borderRadius="xl"
+                        _hover={{
+                          transform: "translateY(-2px)",
+                          boxShadow: "lg",
+                        }}
+                        transition="all 0.2s"
+                      >
+                        <Icon as={FaTrophy} color="gray.300" w={7} h={7} />
+                        <VStack align="start" spacing={0}>
+                          <Text fontWeight="bold" fontSize="lg">
+                            2nd Place
+                          </Text>
+                          <Text fontSize="xl" fontWeight="extrabold">
+                            $100 Amazon Gift Card
+                          </Text>
+                        </VStack>
+                      </HStack>
+                      <HStack
+                        spacing={4}
+                        p={4}
+                        bg="whiteAlpha.200"
+                        borderRadius="xl"
+                        _hover={{
+                          transform: "translateY(-2px)",
+                          boxShadow: "lg",
+                        }}
+                        transition="all 0.2s"
+                      >
+                        <Icon as={FaTrophy} color="orange.300" w={6} h={6} />
+                        <VStack align="start" spacing={0}>
+                          <Text fontWeight="bold" fontSize="lg">
+                            3rd Place
+                          </Text>
+                          <Text fontSize="xl" fontWeight="extrabold">
+                            $50 Amazon Gift Card
+                          </Text>
+                        </VStack>
+                      </HStack>
+                    </VStack>
                   </Box>
-                  <Text fontSize="md" color="gray.600">
+
+                  <Text
+                    fontSize="sm"
+                    color={subTextColor}
+                    textAlign="center"
+                    fontStyle="italic"
+                  >
                     For more details, visit the official contest page or contact
                     the organizers.
                   </Text>
                 </VStack>
               </ModalBody>
-              <ModalFooter>
+              <ModalFooter justifyContent="center" pt={6}>
                 <Button
                   colorScheme="blue"
+                  size="lg"
                   borderRadius="full"
-                  px={8}
+                  px={12}
                   onClick={onClose}
+                  bgGradient="linear(to-r, blue.400, blue.600)"
+                  _hover={{
+                    bgGradient: "linear(to-r, blue.500, blue.700)",
+                    transform: "translateY(-2px)",
+                    boxShadow: "lg",
+                  }}
+                  transition="all 0.2s"
                 >
-                  Close
+                  Got it!
                 </Button>
               </ModalFooter>
             </ModalContent>
@@ -521,12 +668,12 @@ function Dashboard() {
       <Modal isOpen={isAboutOpen} onClose={onAboutClose} isCentered>
         <ModalOverlay />
         <ModalContent borderRadius="2xl" boxShadow="2xl">
-          <ModalHeader color="uoft.navy" fontWeight="bold" fontSize="2xl">
+          <ModalHeader color={mainTextColor} fontWeight="bold" fontSize="2xl">
             About UofT Stocker
           </ModalHeader>
           <ModalCloseButton />
           <ModalBody>
-            <Text fontSize="lg" color="gray.700">
+            <Text fontSize="lg" color={subTextColor}>
               UofT Stocker is a simulated stock trading platform for University
               of Toronto students. Compete with your peers, manage a virtual
               portfolio, and climb the leaderboard! No real money is

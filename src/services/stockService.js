@@ -1,0 +1,126 @@
+import axios from "axios";
+
+// Global cache and rate limiting
+const priceCache = new Map();
+const CACHE_DURATION = 60000; // 1 minute cache
+let apiCallsCount = 0;
+let lastResetTime = Date.now();
+const API_CALL_LIMIT = 60;
+const FINNHUB_API_KEY = "d0vg651r01qkepd02btgd0vg651r01qkepd02bu0";
+
+const checkRateLimit = () => {
+  const now = Date.now();
+  if (now - lastResetTime >= 60000) {
+    apiCallsCount = 0;
+    lastResetTime = now;
+    return true;
+  }
+
+  if (apiCallsCount >= API_CALL_LIMIT) {
+    console.warn("Rate limit reached, using cached data");
+    return false;
+  }
+
+  return true;
+};
+
+const getCachedPrice = (stockSymbol) => {
+  const cached = priceCache.get(stockSymbol);
+  if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
+    return cached.data;
+  }
+  return null;
+};
+
+export const fetchStockPrice = async (stockSymbol) => {
+  try {
+    if (!stockSymbol || !stockSymbol.match(/^[A-Za-z]+$/)) {
+      throw new Error("Invalid symbol format. Use letters only.");
+    }
+
+    const cachedData = getCachedPrice(stockSymbol);
+    if (cachedData) {
+      console.log(`Using cached price for ${stockSymbol}`);
+      return cachedData;
+    }
+
+    if (!checkRateLimit()) {
+      const cached = getCachedPrice(stockSymbol);
+      if (cached) {
+        console.log(`Using cached price for ${stockSymbol} due to rate limit`);
+        return cached;
+      }
+      throw new Error("Rate limit reached. Please try again later.");
+    }
+
+    apiCallsCount++;
+
+    const response = await axios.get("https://finnhub.io/api/v1/quote", {
+      params: {
+        symbol: stockSymbol,
+        token: FINNHUB_API_KEY,
+      },
+    });
+
+    const data = response.data;
+    if (!data || data.c === 0) {
+      throw new Error(`Symbol '${stockSymbol}' not found.`);
+    }
+
+    const stockData = {
+      symbol: stockSymbol,
+      price: data.c,
+      previousClose: data.pc,
+      change: data.c - data.pc,
+      changePercent: ((data.c - data.pc) / data.pc) * 100,
+      currency: "USD",
+      exchange: "Finnhub",
+      timestamp: new Date().toLocaleString(),
+    };
+
+    priceCache.set(stockSymbol, {
+      data: stockData,
+      timestamp: Date.now(),
+    });
+
+    return stockData;
+  } catch (error) {
+    console.error("Finnhub API error:", error.message);
+    throw error;
+  }
+};
+
+export const fetchStockPrices = async (symbols) => {
+  const uniqueSymbols = [...new Set(symbols)];
+  const priceMap = {};
+
+  // Use cached prices first
+  uniqueSymbols.forEach((symbol) => {
+    const cached = getCachedPrice(symbol);
+    if (cached) {
+      priceMap[symbol] = cached;
+    }
+  });
+
+  // Batch uncached symbols into groups of 10 for parallel fetching
+  const uncachedSymbols = uniqueSymbols.filter((symbol) => !priceMap[symbol]);
+  const batchSize = 10;
+
+  for (let i = 0; i < uncachedSymbols.length; i += batchSize) {
+    const batch = uncachedSymbols.slice(i, i + batchSize);
+    await Promise.all(
+      batch.map(async (symbol) => {
+        try {
+          const price = await fetchStockPrice(symbol);
+          if (price) {
+            priceMap[symbol] = price;
+          }
+        } catch (error) {
+          console.error(`Error fetching price for ${symbol}:`, error);
+        }
+      })
+    );
+  }
+
+  return priceMap;
+};

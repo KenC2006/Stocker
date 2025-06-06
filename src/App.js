@@ -1,5 +1,5 @@
 import React from "react";
-import { ChakraProvider, CSSReset } from "@chakra-ui/react";
+import { ChakraProvider, CSSReset, Box } from "@chakra-ui/react";
 import {
   BrowserRouter as Router,
   Routes,
@@ -24,40 +24,42 @@ function App() {
   return (
     <ChakraProvider theme={theme}>
       <CSSReset />
-      <AuthProvider>
-        <Router>
+      <Router>
+        <AuthProvider>
           <Navbar />
-          <Routes>
-            <Route path="/login" element={<Login />} />
-            <Route path="/signup" element={<SignUp />} />
-            <Route
-              path="/dashboard"
-              element={
-                <PrivateRoute>
-                  <Dashboard />
-                </PrivateRoute>
-              }
-            />
-            <Route
-              path="/leaderboard"
-              element={
-                <PrivateRoute>
-                  <Leaderboard />
-                </PrivateRoute>
-              }
-            />
-            <Route
-              path="/trading"
-              element={
-                <PrivateRoute>
-                  <Trading />
-                </PrivateRoute>
-              }
-            />
-            <Route path="/" element={<Navigate to="/dashboard" />} />
-          </Routes>
-        </Router>
-      </AuthProvider>
+          <Box pt="72px">
+            <Routes>
+              <Route path="/login" element={<Login />} />
+              <Route path="/signup" element={<SignUp />} />
+              <Route
+                path="/dashboard"
+                element={
+                  <PrivateRoute>
+                    <Dashboard />
+                  </PrivateRoute>
+                }
+              />
+              <Route
+                path="/leaderboard"
+                element={
+                  <PrivateRoute>
+                    <Leaderboard />
+                  </PrivateRoute>
+                }
+              />
+              <Route
+                path="/trading"
+                element={
+                  <PrivateRoute>
+                    <Trading />
+                  </PrivateRoute>
+                }
+              />
+              <Route path="/" element={<Navigate to="/dashboard" />} />
+            </Routes>
+          </Box>
+        </AuthProvider>
+      </Router>
     </ChakraProvider>
   );
 }
