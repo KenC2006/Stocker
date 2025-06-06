@@ -87,7 +87,11 @@ function Leaderboard() {
           major: userData.major,
           studyYear: userData.studyYear,
           cash: userData.balance || 0,
+          portfolioValue: userData.portfolioValue || 0,
           totalValue: userData.totalValue || 0,
+          gainLoss: userData.gainLoss || 0,
+          gainLossPercent: userData.gainLossPercent || 0,
+          initialInvestment: userData.initialInvestment || 30000,
           lastLeaderboardUpdate: userData.lastLeaderboardUpdate,
         };
       });
@@ -282,8 +286,8 @@ function Leaderboard() {
                         </Td>
                         <Td isNumeric fontWeight="bold" color="uoft.navy">
                           $
-                          {typeof trader.totalValue === "number"
-                            ? trader.totalValue.toLocaleString(undefined, {
+                          {typeof trader.portfolioValue === "number"
+                            ? trader.portfolioValue.toLocaleString(undefined, {
                                 minimumFractionDigits: 2,
                                 maximumFractionDigits: 2,
                               })
@@ -305,27 +309,29 @@ function Leaderboard() {
                         </Td>
                         <Td isNumeric color="gray.600">
                           $
-                          {trader.totalValue.toLocaleString(undefined, {
+                          {trader.initialInvestment.toLocaleString(undefined, {
                             minimumFractionDigits: 2,
                             maximumFractionDigits: 2,
                           })}
                         </Td>
                         <Td isNumeric>
                           <Badge
-                            colorScheme={
-                              trader.totalValue >= 0 ? "green" : "red"
-                            }
+                            colorScheme={trader.gainLoss >= 0 ? "green" : "red"}
                             fontSize="sm"
                             px={2}
                             py={1}
                           >
-                            {trader.totalValue >= 0 ? "+" : ""}$
-                            {typeof trader.totalValue === "number"
-                              ? trader.totalValue.toLocaleString(undefined, {
-                                  minimumFractionDigits: 2,
-                                  maximumFractionDigits: 2,
-                                })
-                              : "0.00"}
+                            {trader.gainLoss >= 0 ? "+" : "-"}$
+                            {Math.abs(trader.gainLoss).toLocaleString(
+                              undefined,
+                              {
+                                minimumFractionDigits: 2,
+                                maximumFractionDigits: 2,
+                              }
+                            )}
+                            {" ("}
+                            {trader.gainLossPercent >= 0 ? "+" : "-"}
+                            {Math.abs(trader.gainLossPercent).toFixed(2)}%{")"}
                           </Badge>
                         </Td>
                       </Tr>
