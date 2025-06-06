@@ -38,6 +38,7 @@ exports.updateLeaderboardDaily = functions.pubsub
       const stocks = stocksSnapshot.docs.map((doc) => doc.data());
 
       let portfolioValue = 0;
+      let initialValue = 0;
       for (const stock of stocks) {
         // Rate limit logic
         if (apiCalls >= API_LIMIT_PER_MIN) {
@@ -64,6 +65,7 @@ exports.updateLeaderboardDaily = functions.pubsub
           const price = response.data.c;
           if (price && stock.quantity) {
             portfolioValue += price * stock.quantity;
+            initialValue += stock.purchasePrice * stock.quantity;
           }
         } catch (err) {
           console.error(
@@ -76,15 +78,30 @@ exports.updateLeaderboardDaily = functions.pubsub
       // Add cash balance
       const cash = user.balance || 0;
       const totalValue = portfolioValue + cash;
+      const initialInvestment = 30000;
+      const gainLoss = totalValue - initialInvestment;
+      const gainLossPercent = (gainLoss / initialInvestment) * 100;
 
-      // Update user document with new total value
+      // Update user document with new values
       try {
         await db.collection("users").doc(user.id).update({
+          portfolioValue,
           totalValue,
+          gainLoss,
+          gainLossPercent,
+          initialInvestment,
           lastLeaderboardUpdate: admin.firestore.FieldValue.serverTimestamp(),
         });
         console.log(
-          `Updated user ${user.id} with totalValue $${totalValue.toFixed(2)}`
+          `Updated user ${
+            user.id
+          } with portfolioValue $${portfolioValue.toFixed(
+            2
+          )}, totalValue $${totalValue.toFixed(
+            2
+          )}, gain/loss $${gainLoss.toFixed(2)} (${gainLossPercent.toFixed(
+            2
+          )}%)`
         );
       } catch (err) {
         console.error(`Error updating user ${user.id}:`, err.message);
