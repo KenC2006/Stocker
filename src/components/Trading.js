@@ -317,13 +317,21 @@ function Trading() {
     }
   };
 
-  // Update isMarketOpen to only restrict trading on weekends
+  // Update isMarketOpen to restrict trading to regular US market hours (Mon-Fri, 9:30am-4:00pm ET)
   function isMarketOpen() {
     const now = new Date();
-    const utcDay = now.getUTCDay(); // 0=Sunday, 1=Monday, ..., 6=Saturday
-    // Only restrict trading on weekends
-    if (utcDay === 0 || utcDay === 6) return false; // Weekend
-    return true; // Allow trading at all hours on weekdays
+    // Get current time in America/New_York (Eastern Time)
+    const nyNow = new Date(
+      now.toLocaleString("en-US", { timeZone: "America/New_York" })
+    );
+    const day = nyNow.getDay(); // 0=Sunday, 1=Monday, ..., 6=Saturday
+    const hours = nyNow.getHours();
+    const minutes = nyNow.getMinutes();
+    // Market open: 9:30am to 4:00pm ET, Monday-Friday
+    if (day === 0 || day === 6) return false; // Weekend
+    if (hours < 9 || (hours === 9 && minutes < 30)) return false; // Before 9:30am
+    if (hours > 16 || (hours === 16 && minutes > 0)) return false; // After 4:00pm
+    return true;
   }
 
   const marketOpen = isMarketOpen();
@@ -332,7 +340,8 @@ function Trading() {
     if (!marketOpen) {
       toast({
         title: "Market Closed",
-        description: "Trading is only allowed Monday through Friday.",
+        description:
+          "Trading is only allowed Monday through Friday, 9:30am to 4:00pm Eastern Time.",
         status: "warning",
         duration: 5000,
         isClosable: true,
@@ -474,6 +483,28 @@ function Trading() {
     }
   };
 
+  // Periodically refresh price for the currently selected stock in the trading tab every minute
+  useEffect(() => {
+    if (!stockData || !stockData.symbol) return;
+    let isMounted = true;
+    const refreshSelectedStockPrice = async () => {
+      try {
+        const updated = await fetchStockPrice(stockData.symbol);
+        if (!isMounted) return;
+        setStockData((prev) => (prev ? { ...prev, ...updated } : prev));
+      } catch (e) {
+        // Optionally handle error
+      }
+    };
+    const interval = setInterval(refreshSelectedStockPrice, 60000);
+    // Initial refresh
+    refreshSelectedStockPrice();
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
+  }, [stockData?.symbol]);
+
   // Periodically refresh prices for all stocks in the portfolio every minute
   useEffect(() => {
     if (!portfolio || portfolio.length === 0) return;
@@ -585,7 +616,7 @@ function Trading() {
               <VStack spacing={6}>
                 <InputGroup size="lg">
                   <Input
-                    placeholder="Enter stock symbol (e.g., AAPL)"
+                    placeholder="Enter stock symbol (e.g., NVDA)"
                     value={symbol}
                     onChange={(e) => setSymbol(e.target.value.toUpperCase())}
                     onKeyDown={(e) => {
@@ -689,8 +720,8 @@ function Trading() {
                           fontWeight="bold"
                           textAlign="center"
                         >
-                          Market is closed on weekends. Trading is allowed
-                          Monday through Friday.
+                          Market is closed. Trading is only allowed Monday
+                          through Friday, 9:30am to 4:00pm Eastern Time.
                         </Text>
                       )}
                     </VStack>
