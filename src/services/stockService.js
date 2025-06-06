@@ -6,7 +6,7 @@ const CACHE_DURATION = 60000; // 1 minute cache
 let apiCallsCount = 0;
 let lastResetTime = Date.now();
 const API_CALL_LIMIT = 60;
-const FINNHUB_API_KEY = "d0vg651r01qkepd02btgd0vg651r01qkepd02bu0";
+const FINNHUB_API_KEY = process.env.REACT_APP_FINNHUB_API_KEY;
 
 const checkRateLimit = () => {
   const now = Date.now();
