@@ -235,7 +235,11 @@ function Navbar() {
                   >
                     <Avatar
                       size="sm"
-                      name={currentUser.displayName || currentUser.email || "U"}
+                      name={
+                        currentUser?.displayName ||
+                        currentUser?.email?.charAt(0)?.toUpperCase() ||
+                        "U"
+                      }
                       bg="blue.400"
                       color="white"
                     />
@@ -377,7 +381,7 @@ function Navbar() {
                   <FormLabel color={menuItemTextColor}>Display Name</FormLabel>
                   <Input
                     placeholder={
-                      currentUser.displayName || "Set your display name"
+                      currentUser?.displayName || "Set your display name"
                     }
                     bg={inputBg}
                     isDisabled
@@ -385,7 +389,11 @@ function Navbar() {
                 </FormControl>
                 <FormControl mt={4}>
                   <FormLabel color={menuItemTextColor}>Email</FormLabel>
-                  <Input value={currentUser.email} isReadOnly bg={inputBg} />
+                  <Input
+                    value={currentUser?.email || ""}
+                    isReadOnly
+                    bg={inputBg}
+                  />
                 </FormControl>
               </Box>
 

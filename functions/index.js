@@ -6,7 +6,7 @@ admin.initializeApp();
 
 const db = admin.firestore();
 
-const FINNHUB_API_KEY = "d0vg651r01qkepd02btgd0vg651r01qkepd02bu0";
+const FINNHUB_API_KEY = process.env.FINNHUB_API_KEY;
 const FINNHUB_URL = "https://finnhub.io/api/v1/quote";
 const API_LIMIT_PER_MIN = 60;
 
