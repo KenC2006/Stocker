@@ -25,4 +25,8 @@ Stocker is a full-stack stock trading simulation web application designed for st
 - **View your portfolio:** See your holdings, real-time values, and profit/loss.
 - **Leaderboard:** Check your rank and see when the next reset will occur (2:00am Toronto time).
 
+## Link
+http://stockerstorage.web.app/
+
+
 **Note:** This project is for educational and simulation purposes only. No real money or real trades are involved.
