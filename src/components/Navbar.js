@@ -4,20 +4,16 @@ import {
   Flex,
   Button,
   Heading,
-  Spacer,
   Container,
   useColorModeValue,
-  Image,
   Avatar,
   Menu,
   MenuButton,
   MenuList,
   MenuItem,
-  IconButton,
   HStack,
   useColorMode,
   Text,
-  Tooltip,
   MenuDivider,
   Switch,
   MenuGroup,
@@ -86,7 +82,6 @@ function Navbar() {
   const cancelRef = React.useRef();
   const toast = useToast();
 
-  // Move all useColorModeValue hooks to the top level
   const navBg = useColorModeValue(
     "rgba(255,255,255,0.85)",
     "rgba(26,32,44,0.85)"
@@ -115,7 +110,6 @@ function Navbar() {
   };
 
   const handleDeleteAccount = () => {
-    // Placeholder for delete account functionality
     toast({
       title: "Not Implemented",
       description: "Account deletion functionality is not yet implemented.",
@@ -297,7 +291,6 @@ function Navbar() {
         </Container>
       </Box>
 
-      {/* Help & Support Modal */}
       <Modal isOpen={isHelpOpen} onClose={onHelpClose} isCentered>
         <ModalOverlay />
         <ModalContent bg={modalBg} borderColor={modalBorder} borderWidth="1px">
@@ -362,7 +355,6 @@ function Navbar() {
         </ModalContent>
       </Modal>
 
-      {/* Account Settings Modal */}
       <Modal isOpen={isAccountOpen} onClose={onAccountClose} size="md">
         <ModalOverlay />
         <ModalContent bg={modalBg} borderColor={modalBorder} borderWidth="1px">
@@ -442,7 +434,6 @@ function Navbar() {
         </ModalContent>
       </Modal>
 
-      {/* Delete Account Confirmation Dialog */}
       <AlertDialog
         isOpen={isDeleteOpen}
         leastDestructiveRef={cancelRef}

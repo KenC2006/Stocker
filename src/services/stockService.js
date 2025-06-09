@@ -2,7 +2,7 @@ import axios from "axios";
 
 // Global cache and rate limiting
 const priceCache = new Map();
-const CACHE_DURATION = 60000; // 1 minute cache
+const CACHE_DURATION = 60000;
 let apiCallsCount = 0;
 let lastResetTime = Date.now();
 const API_CALL_LIMIT = 60;
@@ -94,7 +94,6 @@ export const fetchStockPrices = async (symbols) => {
   const uniqueSymbols = [...new Set(symbols)];
   const priceMap = {};
 
-  // Use cached prices first
   uniqueSymbols.forEach((symbol) => {
     const cached = getCachedPrice(symbol);
     if (cached) {
@@ -102,7 +101,6 @@ export const fetchStockPrices = async (symbols) => {
     }
   });
 
-  // Batch uncached symbols into groups of 10 for parallel fetching
   const uncachedSymbols = uniqueSymbols.filter((symbol) => !priceMap[symbol]);
   const batchSize = 10;
 

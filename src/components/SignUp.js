@@ -57,10 +57,8 @@ function SignUp() {
 
     try {
       setLoading(true);
-      // Create the user account
       const userCredential = await signup(email, password);
 
-      // Store additional user data in Firestore
       await setDoc(doc(db, "users", userCredential.user.uid), {
         email,
         firstName,

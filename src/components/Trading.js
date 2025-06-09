@@ -16,11 +16,6 @@ import {
   Td,
   InputGroup,
   InputRightElement,
-  Stat,
-  StatLabel,
-  StatNumber,
-  StatHelpText,
-  StatArrow,
   useColorModeValue,
   Badge,
   NumberInput,
@@ -28,43 +23,26 @@ import {
   NumberInputStepper,
   NumberIncrementStepper,
   NumberDecrementStepper,
-  Tabs,
-  TabList,
-  TabPanels,
-  Tab,
-  TabPanel,
   Alert,
   AlertIcon,
-  Progress,
   Skeleton,
   HStack,
   Flex,
 } from "@chakra-ui/react";
-import { SearchIcon } from "@chakra-ui/icons";
-import axios from "axios";
 import { useAuth } from "../contexts/AuthContext";
 import { useLocation } from "react-router-dom";
 import { db } from "../config/firebase";
 import {
   collection,
-  addDoc,
   query,
   where,
   getDocs,
-  deleteDoc,
   doc,
   getDoc,
-  updateDoc,
   writeBatch,
   serverTimestamp,
   increment,
 } from "firebase/firestore";
-import {
-  FaChartLine,
-  FaSearch,
-  FaArrowRight,
-  FaInfoCircle,
-} from "react-icons/fa";
 import { fetchStockPrice, fetchStockPrices } from "../services/stockService";
 
 function Trading() {
@@ -73,7 +51,7 @@ function Trading() {
   const [loading, setLoading] = useState(false);
   const [quantity, setQuantity] = useState(1);
   const [portfolio, setPortfolio] = useState([]);
-  const [loadingPortfolio, setLoadingPortfolio] = useState(true);
+  const [, setLoadingPortfolio] = useState(true);
   const [userData, setUserData] = useState(null);
   const [sellQuantities, setSellQuantities] = useState({});
   const location = useLocation();
@@ -81,66 +59,22 @@ function Trading() {
   const { currentUser } = useAuth();
   const toast = useToast();
 
-  const bgColor = useColorModeValue("white", "gray.800");
   const borderColor = useColorModeValue("gray.200", "gray.600");
   const mainTextColor = useColorModeValue("blue.900", "white");
   const subTextColor = useColorModeValue("gray.600", "gray.200");
-  const statNumberColor = useColorModeValue("blue.800", "blue.200");
   const pageBgColor = useColorModeValue("gray.50", "gray.900");
   const cardBgColor = useColorModeValue("white", "gray.800");
-  const cardBorderColor = useColorModeValue("blue.400", borderColor);
-  const tableHeaderBg = useColorModeValue("blue.100", "blue.800");
-  const tableRowAltBg = useColorModeValue("white", "blue.800");
-  const tableRowBg = useColorModeValue("blue.50", "blue.900");
-  const buyButtonGradient = useColorModeValue(
-    "linear(to-r, blue.400, blue.600)",
-    "linear(to-r, blue.700, blue.900)"
-  );
-  const buyButtonHover = useColorModeValue("blue.600", "blue.400");
-  const sellButtonBg = useColorModeValue("red.500", "red.400");
-  const sellButtonColor = useColorModeValue("white", "blue.900");
-  const sellButtonHover = useColorModeValue("red.600", "red.300");
-  const tabSelectedBg = useColorModeValue("blue.200", "blue.700");
-  const tabSelectedColor = useColorModeValue("blue.900", "white");
   const numberInputBg = useColorModeValue("gray.100", "gray.700");
 
-  // Blue gradient for hover and avatar
-  const blueGradient = useColorModeValue(
-    "linear(to-r, blue.400, blue.600)",
-    "linear(to-r, blue.700, blue.900)"
-  );
-  const blueSolid = useColorModeValue("blue.600", "blue.400");
-
-  // Use solid blue for avatar and row hover
-  const solidAvatarBg = useColorModeValue("blue.600", "blue.300");
-  const solidAvatarColor = "white";
-  const tableRowHoverBg = useColorModeValue("blue.50", "blue.900");
-
-  // For P/L badge (only green and red)
-  const badgePositiveColorScheme = "green";
-  const badgeNegativeColorScheme = "red";
-  const badgePositiveBg = useColorModeValue("green.100", "green.700");
-  const badgeNegativeBg = useColorModeValue("red.100", "red.700");
-  const badgePositiveColor = useColorModeValue("green.800", "green.200");
-  const badgeNegativeColor = useColorModeValue("red.800", "red.200");
-
-  const tableRowBorderBottom = useColorModeValue(
-    "1px solid #90cdf4",
-    "1px solid #2b6cb0"
-  );
-
-  // Add new color mode values
   const stockHeaderBg = useColorModeValue("gray.50", "gray.700");
   const tradingControlsBg = useColorModeValue("gray.50", "gray.700");
   const cardShadow = useColorModeValue("lg", "dark-lg");
 
-  // Consolidated data fetching
   const fetchData = async () => {
     if (!currentUser) return;
 
     setLoadingPortfolio(true);
     try {
-      // Fetch user data and stocks in parallel
       const [userDoc, stocksSnapshot] = await Promise.all([
         getDoc(doc(db, "users", currentUser.uid)),
         getDocs(
@@ -151,24 +85,20 @@ function Trading() {
         ),
       ]);
 
-      // Process user data
       if (userDoc.exists()) {
         setUserData(userDoc.data());
       }
 
-      // Process portfolio data
       const stocksRaw = stocksSnapshot.docs.map((doc) => ({
         id: doc.id,
         ...doc.data(),
       }));
 
-      // Get prices for all stocks
       const uniqueSymbols = [
         ...new Set(stocksRaw.map((stock) => stock.symbol)),
       ];
       const priceMap = await fetchStockPrices(uniqueSymbols);
 
-      // Build portfolio with price data
       const stocks = stocksRaw.map((stock) => {
         const priceData = priceMap[stock.symbol];
         if (priceData) {
@@ -185,7 +115,7 @@ function Trading() {
         }
         return {
           ...stock,
-          currentPrice: stock.purchasePrice, // Fallback to purchase price if current price unavailable
+          currentPrice: stock.purchasePrice,
           totalValue: stock.purchasePrice * stock.quantity,
           profitLoss: 0,
           profitLossPercentage: 0,
@@ -207,16 +137,14 @@ function Trading() {
     }
   };
 
-  // Initial data fetch and refresh on route change
   useEffect(() => {
     fetchData();
   }, [currentUser, location.pathname]);
 
-  // Periodic refresh of portfolio data
   useEffect(() => {
     if (!portfolio.length) return;
 
-    const interval = setInterval(fetchData, 60000); // Refresh every minute
+    const interval = setInterval(fetchData, 60000);
 
     return () => clearInterval(interval);
   }, [portfolio.length]);
@@ -258,20 +186,19 @@ function Trading() {
     }
   };
 
-  // Update isMarketOpen to restrict trading to regular US market hours (Mon-Fri, 9:30am-4:00pm ET)
   function isMarketOpen() {
     const now = new Date();
-    // Get current time in America/New_York (Eastern Time)
+
     const nyNow = new Date(
       now.toLocaleString("en-US", { timeZone: "America/New_York" })
     );
-    const day = nyNow.getDay(); // 0=Sunday, 1=Monday, ..., 6=Saturday
+    const day = nyNow.getDay();
     const hours = nyNow.getHours();
     const minutes = nyNow.getMinutes();
-    // Market open: 9:30am to 4:00pm ET, Monday-Friday
-    if (day === 0 || day === 6) return false; // Weekend
-    if (hours < 9 || (hours === 9 && minutes < 30)) return false; // Before 9:30am
-    if (hours > 16 || (hours === 16 && minutes > 0)) return false; // After 4:00pm
+
+    if (day === 0 || day === 6) return false;
+    if (hours < 9 || (hours === 9 && minutes < 30)) return false;
+    if (hours > 16 || (hours === 16 && minutes > 0)) return false;
     return true;
   }
 
@@ -301,13 +228,11 @@ function Trading() {
           throw new Error("Insufficient funds");
         }
 
-        // Update user balance
         const userRef = doc(db, "users", currentUser.uid);
         batch.update(userRef, {
           balance: userData.balance - cost,
         });
 
-        // Check if user already owns this stock
         const existingStockQuery = query(
           collection(db, "stocks"),
           where("userId", "==", currentUser.uid),
@@ -316,7 +241,6 @@ function Trading() {
         const existingStockDocs = await getDocs(existingStockQuery);
 
         if (!existingStockDocs.empty) {
-          // Update existing position
           const existingStock = existingStockDocs.docs[0];
           const newQuantity = existingStock.data().quantity + quantity;
           const newAvgPrice =
@@ -330,7 +254,6 @@ function Trading() {
             purchasePrice: newAvgPrice,
           });
         } else {
-          // Create new position
           const stockRef = doc(collection(db, "stocks"));
           batch.set(stockRef, {
             userId: currentUser.uid,
@@ -341,20 +264,16 @@ function Trading() {
           });
         }
 
-        // Commit the batch
         await batch.commit();
 
-        // Optimistically update state
         setUserData((prev) => ({
           ...prev,
           balance: prev.balance - cost,
         }));
 
-        // Only fetch portfolio if it's a new position
         if (existingStockDocs.empty) {
           await fetchData();
         } else {
-          // Optimistically update portfolio for existing position
           setPortfolio((prev) =>
             prev.map((stock) =>
               stock.symbol === stockData.symbol
@@ -404,19 +323,16 @@ function Trading() {
     }
 
     try {
-      // Get latest price
       const priceData = await fetchStockPrice(stock.symbol);
       const proceeds = priceData.price * sellQuantity;
 
       const batch = writeBatch(db);
 
-      // Update user balance
       const userRef = doc(db, "users", currentUser.uid);
       batch.update(userRef, {
         balance: increment(proceeds),
       });
 
-      // Update or delete stock position
       const stockRef = doc(db, "stocks", stock.id);
       if (sellQuantity === stock.quantity) {
         batch.delete(stockRef);
@@ -426,22 +342,19 @@ function Trading() {
         });
       }
 
-      // Commit the batch
       await batch.commit();
 
-      // Optimistically update state
       setUserData((prev) => ({
         ...prev,
         balance: prev.balance + proceeds,
       }));
 
-      // Optimistically update portfolio
       setPortfolio((prev) =>
         prev
           .map((s) => {
             if (s.id === stock.id) {
               if (sellQuantity === s.quantity) {
-                return null; // Remove stock
+                return null;
               }
               return {
                 ...s,
@@ -477,7 +390,6 @@ function Trading() {
     }
   };
 
-  // Add refresh for currently selected stock
   useEffect(() => {
     if (!stockData?.symbol) return;
     let isMounted = true;
@@ -510,7 +422,6 @@ function Trading() {
   return (
     <Box minH="100vh" bg={pageBgColor} py={8}>
       <Container maxW="container.xl">
-        {/* Header with Balance */}
         <Flex
           direction={{ base: "column", md: "row" }}
           justify="space-between"
@@ -526,7 +437,6 @@ function Trading() {
           </VStack>
           <Box bg={cardBgColor} p={4} borderRadius="lg" boxShadow={cardShadow}>
             <HStack spacing={8} align="end">
-              {/* Available Balance */}
               <VStack align="end" spacing={1}>
                 <Text color={subTextColor} fontSize="sm">
                   Available Balance
@@ -543,7 +453,6 @@ function Trading() {
                 </Text>
               </VStack>
 
-              {/* Portfolio Value */}
               <VStack align="end" spacing={1}>
                 <Text color={subTextColor} fontSize="sm">
                   Portfolio Value
@@ -567,12 +476,9 @@ function Trading() {
           </Box>
         </Flex>
 
-        {/* Main Content */}
         <Flex gap={8} direction={{ base: "column", xl: "row" }}>
-          {/* Left Panel - Trading Interface */}
           <Box flex={1}>
             <VStack spacing={6} align="stretch">
-              {/* Search Bar */}
               <Box
                 bg={cardBgColor}
                 p={6}
@@ -610,7 +516,6 @@ function Trading() {
                 </VStack>
               </Box>
 
-              {/* Stock Info & Trading Panel */}
               {stockData && (
                 <Box
                   bg={cardBgColor}
@@ -618,7 +523,6 @@ function Trading() {
                   boxShadow={cardShadow}
                   overflow="hidden"
                 >
-                  {/* Stock Header */}
                   <Box
                     p={6}
                     borderBottom="1px"
@@ -662,10 +566,8 @@ function Trading() {
                     </Flex>
                   </Box>
 
-                  {/* Trading Controls */}
                   <Box p={6}>
                     <VStack spacing={6}>
-                      {/* Market Status */}
                       <HStack
                         w="100%"
                         p={3}
@@ -684,7 +586,6 @@ function Trading() {
                         </Text>
                       </HStack>
 
-                      {/* Trade Form */}
                       <HStack w="100%" spacing={4}>
                         <Box flex={1}>
                           <Text mb={2} color={subTextColor} fontSize="sm">
@@ -720,7 +621,6 @@ function Trading() {
                         </Box>
                       </HStack>
 
-                      {/* Action Buttons */}
                       <HStack w="100%" spacing={4}>
                         <Button
                           flex={1}
@@ -749,7 +649,6 @@ function Trading() {
             </VStack>
           </Box>
 
-          {/* Right Panel - Portfolio */}
           <Box
             flex={1}
             bg={cardBgColor}

@@ -13,10 +13,7 @@ import {
   StatLabel,
   StatNumber,
   StatHelpText,
-  StatArrow,
   Skeleton,
-  Badge,
-  Td,
   useDisclosure,
   Modal,
   ModalOverlay,
@@ -27,6 +24,8 @@ import {
   ModalFooter,
   IconButton,
   HStack,
+
+  // optimize api and read write usage at some point
 } from "@chakra-ui/react";
 import { Link } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
@@ -50,8 +49,7 @@ import {
   serverTimestamp,
 } from "firebase/firestore";
 import { db } from "../config/firebase";
-import { fetchStockPrice, fetchStockPrices } from "../services/stockService";
-import axios from "axios";
+import { fetchStockPrices } from "../services/stockService";
 
 function Dashboard() {
   const { currentUser } = useAuth();
@@ -116,13 +114,8 @@ function Dashboard() {
 
   const fetchUserRank = async (userTotalValue) => {
     try {
-      // Get all users with minimal fields
       const usersSnapshot = await getDocs(
-        query(
-          collection(db, "users"),
-          // Only fetch necessary fields
-          where("totalValue", ">=", 0)
-        )
+        query(collection(db, "users"), where("totalValue", ">=", 0))
       );
 
       const allUsers = usersSnapshot.docs.map((doc) => ({
@@ -150,7 +143,6 @@ function Dashboard() {
 
     setLoading(true);
     try {
-      // Fetch user data and stocks in parallel
       const [userDoc, stocksSnapshot] = await Promise.all([
         getDoc(doc(db, "users", currentUser.uid)),
         getDocs(
@@ -167,7 +159,6 @@ function Dashboard() {
 
       const userStocks = stocksSnapshot.docs.map((doc) => doc.data());
 
-      // Calculate portfolio stats and fetch rank in parallel
       const [stats, rankData] = await Promise.all([
         calculatePortfolioStats(userStocks, cash),
         fetchUserRank(userData?.totalValue || 0),
@@ -179,7 +170,6 @@ function Dashboard() {
         cash,
       });
 
-      // Update user document with new values if they've changed significantly
       const shouldUpdate =
         Math.abs(stats.totalValue - (userData?.totalValue || 0)) > 1;
       if (shouldUpdate) {
@@ -340,7 +330,6 @@ function Dashboard() {
                 </VStack>
               </Box>
             ))}
-            {/* Contest Info Box */}
             <Box
               bg={bgColor}
               p={6}
@@ -418,7 +407,6 @@ function Dashboard() {
               </Button>
             </VStack>
           </Box>
-          {/* Contest Info Modal */}
           <Modal
             isOpen={isOpen}
             onClose={onClose}
@@ -462,12 +450,11 @@ function Dashboard() {
                     fontWeight="medium"
                     lineHeight="tall"
                   >
-                    Welcome to the UofT Stocker Trading Contest! Compete with
-                    fellow students to grow your virtual portfolio and climb the
-                    leaderboard.
+                    This months is standard. All accounts will start with
+                    $30,000. Trade your way to the top before the month is over
+                    and win prizes!
                   </Text>
 
-                  {/* Rules Section */}
                   <Box
                     bg="uoft.navy"
                     color="white"
@@ -512,14 +499,13 @@ function Dashboard() {
                       <HStack spacing={4}>
                         <Box w={1} h={6} bg="blue.300" borderRadius="full" />
                         <Text>
-                          No real money is involved—it's all for fun and
-                          learning!
+                          No real money is involved - Winners will be contacted
+                          by the end of the contest via Gmail
                         </Text>
                       </HStack>
                     </VStack>
                   </Box>
 
-                  {/* Prizes Section */}
                   <Box
                     bg="uoft.lightBlue"
                     color="white"
@@ -564,7 +550,7 @@ function Dashboard() {
                             1st Place
                           </Text>
                           <Text fontSize="xl" fontWeight="extrabold">
-                            $200 Amazon Gift Card
+                            $50 Amazon Gift Card
                           </Text>
                         </VStack>
                       </HStack>
@@ -585,7 +571,7 @@ function Dashboard() {
                             2nd Place
                           </Text>
                           <Text fontSize="xl" fontWeight="extrabold">
-                            $100 Amazon Gift Card
+                            $25 Amazon Gift Card
                           </Text>
                         </VStack>
                       </HStack>
@@ -606,7 +592,7 @@ function Dashboard() {
                             3rd Place
                           </Text>
                           <Text fontSize="xl" fontWeight="extrabold">
-                            $50 Amazon Gift Card
+                            $10 Amazon Gift Card
                           </Text>
                         </VStack>
                       </HStack>
@@ -619,8 +605,7 @@ function Dashboard() {
                     textAlign="center"
                     fontStyle="italic"
                   >
-                    For more details, visit the official contest page or contact
-                    the organizers.
+                    For more details, contact organizers
                   </Text>
                 </VStack>
               </ModalBody>
@@ -646,7 +631,6 @@ function Dashboard() {
           </Modal>
         </VStack>
       </Container>
-      {/* Floating About Button */}
       <IconButton
         icon={<FaQuestionCircle />}
         aria-label="About UofT Stocker"
@@ -674,10 +658,11 @@ function Dashboard() {
           <ModalCloseButton />
           <ModalBody>
             <Text fontSize="lg" color={subTextColor}>
-              UofT Stocker is a simulated stock trading platform for University
-              of Toronto students. Compete with your peers, manage a virtual
-              portfolio, and climb the leaderboard! No real money is
-              involved—it's all for fun and learning.
+              UofT Stocker is a simulated stock trading platform designed for
+              University of Toronto students. Compete with your peers, manage a
+              virtual portfolio, and climb the leaderboard. Each month features
+              a unique contest to see who can grow their portfolio the most. Aim
+              for the top and earn rewards—click on "Contest Info" for details.
             </Text>
           </ModalBody>
         </ModalContent>
