@@ -16,12 +16,12 @@ import {
   Skeleton,
   TableContainer,
   Tag,
-  SimpleGrid,
+  // leaderboard stuff is perfectly optimized basically, just improve ui maybe
 } from "@chakra-ui/react";
 import { motion } from "framer-motion";
 import { db } from "../config/firebase";
 import { collection, getDocs } from "firebase/firestore";
-import { FaTrophy, FaUserCircle } from "react-icons/fa";
+import { FaTrophy } from "react-icons/fa";
 
 const MotionTr = motion(Tr);
 
@@ -30,9 +30,7 @@ function Leaderboard() {
   const [isLoading, setIsLoading] = useState(true);
   const [timeLeft, setTimeLeft] = useState(0);
 
-  const bgColor = useColorModeValue("white", "gray.800");
   const headerBgColor = useColorModeValue("gray.50", "gray.700");
-  const hoverBgColor = useColorModeValue("gray.50", "gray.700");
   const borderColor = useColorModeValue("gray.200", "gray.700");
   const mainTextColor = useColorModeValue("uoft.navy", "white");
   const subTextColor = useColorModeValue("gray.600", "gray.200");
@@ -51,21 +49,17 @@ function Leaderboard() {
     fetchLeaderboardData();
   }, []);
 
-  // Countdown timer for next leaderboard reset (2am Toronto time)
   useEffect(() => {
     const getNextReset = () => {
-      // Get current time in America/Toronto
       const now = new Date();
       const torontoNow = new Date(
         now.toLocaleString("en-US", { timeZone: "America/Toronto" })
       );
-      // Set next reset to 2:00am Toronto time
       const next = new Date(torontoNow);
       next.setHours(2, 0, 0, 0);
       if (torontoNow >= next) {
         next.setDate(next.getDate() + 1);
       }
-      // Calculate the difference in Toronto time
       return next - torontoNow;
     };
     const updateTimer = () => {
@@ -76,7 +70,6 @@ function Leaderboard() {
     return () => clearInterval(interval);
   }, []);
 
-  // Format time left as HH:MM:SS
   const formatTime = (ms) => {
     let totalSeconds = Math.floor(ms / 1000);
     const hours = String(Math.floor(totalSeconds / 3600)).padStart(2, "0");
@@ -151,9 +144,8 @@ function Leaderboard() {
               Stock Trading Leaderboard
             </Heading>
             <Text mt={2} color={subTextColor}>
-              See how your portfolio stacks up against other traders
+              See how your portfolio stacks up against your friends!
             </Text>
-            {/* Countdown Timer */}
             <Box
               mt={4}
               mb={2}
