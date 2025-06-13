@@ -419,9 +419,15 @@ function Trading() {
     };
   }, [stockData?.symbol]);
 
+  const handleMaxBuy = () => {
+    if (!stockData || !userData) return;
+    const maxQuantity = Math.floor(userData.balance / stockData.price);
+    setQuantity(maxQuantity);
+  };
+
   return (
     <Box minH="100vh" bg={pageBgColor} py={8}>
-      <Container maxW="container.xl">
+      <Container maxW="1400px">
         <Flex
           direction={{ base: "column", md: "row" }}
           justify="space-between"
@@ -477,7 +483,7 @@ function Trading() {
         </Flex>
 
         <Flex gap={8} direction={{ base: "column", xl: "row" }}>
-          <Box flex={1}>
+          <Box flex={0.8}>
             <VStack spacing={6} align="stretch">
               <Box
                 bg={cardBgColor}
@@ -488,7 +494,7 @@ function Trading() {
                 <VStack spacing={4}>
                   <InputGroup size="lg">
                     <Input
-                      placeholder="Search stock symbol (NVDA)"
+                      placeholder="Search stock symbol (EG. NVDA)"
                       value={symbol}
                       onChange={(e) => setSymbol(e.target.value.toUpperCase())}
                       bg={useColorModeValue("white", "gray.700")}
@@ -623,13 +629,21 @@ function Trading() {
 
                       <HStack w="100%" spacing={4}>
                         <Button
-                          flex={1}
-                          size="lg"
-                          colorScheme="green"
+                          colorScheme="blue"
                           onClick={() => handleTrade("buy")}
-                          isDisabled={!isMarketOpen()}
+                          isDisabled={!stockData || !isMarketOpen()}
+                          flex="1"
                         >
-                          Buy {stockData.symbol}
+                          Buy
+                        </Button>
+                        <Button
+                          colorScheme="blue"
+                          variant="outline"
+                          onClick={handleMaxBuy}
+                          isDisabled={!stockData || !isMarketOpen()}
+                          flex="1"
+                        >
+                          Max Buy
                         </Button>
                       </HStack>
 
@@ -650,11 +664,12 @@ function Trading() {
           </Box>
 
           <Box
-            flex={1}
+            flex={1.4}
             bg={cardBgColor}
             borderRadius="lg"
             boxShadow={cardShadow}
             height="fit-content"
+            overflow="hidden"
           >
             <Box
               p={4}
@@ -668,78 +683,91 @@ function Trading() {
             </Box>
 
             {portfolio.length > 0 ? (
-              <Table variant="simple">
-                <Thead>
-                  <Tr>
-                    <Th>Symbol</Th>
-                    <Th isNumeric>Shares</Th>
-                    <Th isNumeric>Avg. Cost</Th>
-                    <Th isNumeric>Current</Th>
-                    <Th isNumeric>P/L</Th>
-                    <Th>Action</Th>
-                  </Tr>
-                </Thead>
-                <Tbody>
-                  {portfolio.map((stock) => (
-                    <Tr key={stock.id}>
-                      <Td fontWeight="bold" color={mainTextColor}>
-                        {stock.symbol}
-                      </Td>
-                      <Td isNumeric>{stock.quantity}</Td>
-                      <Td isNumeric>${stock.purchasePrice.toFixed(2)}</Td>
-                      <Td isNumeric>${stock.currentPrice.toFixed(2)}</Td>
-                      <Td isNumeric>
-                        <Text
-                          color={
-                            stock.profitLoss >= 0 ? "green.400" : "red.400"
-                          }
-                          fontWeight="bold"
-                        >
-                          {stock.profitLoss >= 0 ? "+" : ""}$
-                          {stock.profitLoss.toFixed(2)}
-                        </Text>
-                      </Td>
-                      <Td>
-                        <HStack spacing={2}>
-                          <NumberInput
-                            size="sm"
-                            min={1}
-                            max={stock.quantity}
-                            value={sellQuantities[stock.id] || 1}
-                            onChange={(value) => {
-                              const numValue = Number(value);
-                              setSellQuantities((prev) => ({
-                                ...prev,
-                                [stock.id]: Math.min(
-                                  Math.max(1, numValue),
-                                  stock.quantity
-                                ),
-                              }));
-                            }}
-                            width="80px"
-                          >
-                            <NumberInputField />
-                            <NumberInputStepper>
-                              <NumberIncrementStepper />
-                              <NumberDecrementStepper />
-                            </NumberInputStepper>
-                          </NumberInput>
-                          <Button
-                            size="sm"
-                            colorScheme="red"
-                            onClick={() =>
-                              handleSell(stock, sellQuantities[stock.id] || 1)
-                            }
-                            isDisabled={!isMarketOpen()}
-                          >
-                            Sell
-                          </Button>
-                        </HStack>
-                      </Td>
-                    </Tr>
-                  ))}
-                </Tbody>
-              </Table>
+              <Box
+                bg={cardBgColor}
+                p={6}
+                borderRadius="xl"
+                boxShadow={cardShadow}
+                overflow="hidden"
+              >
+                <Box overflowX="auto">
+                  <Table variant="simple">
+                    <Thead>
+                      <Tr>
+                        <Th>Symbol</Th>
+                        <Th isNumeric>Shares</Th>
+                        <Th isNumeric>Avg. Cost</Th>
+                        <Th isNumeric>Current</Th>
+                        <Th isNumeric>P/L</Th>
+                        <Th>Action</Th>
+                      </Tr>
+                    </Thead>
+                    <Tbody>
+                      {portfolio.map((stock) => (
+                        <Tr key={stock.id}>
+                          <Td fontWeight="bold" color={mainTextColor}>
+                            {stock.symbol}
+                          </Td>
+                          <Td isNumeric>{stock.quantity}</Td>
+                          <Td isNumeric>${stock.purchasePrice.toFixed(2)}</Td>
+                          <Td isNumeric>${stock.currentPrice.toFixed(2)}</Td>
+                          <Td isNumeric>
+                            <Text
+                              color={
+                                stock.profitLoss >= 0 ? "green.400" : "red.400"
+                              }
+                              fontWeight="bold"
+                            >
+                              {stock.profitLoss >= 0 ? "+" : ""}$
+                              {stock.profitLoss.toFixed(2)}
+                            </Text>
+                          </Td>
+                          <Td>
+                            <HStack spacing={2}>
+                              <NumberInput
+                                size="sm"
+                                min={1}
+                                max={stock.quantity}
+                                value={sellQuantities[stock.id] || 1}
+                                onChange={(value) => {
+                                  const numValue = Number(value);
+                                  setSellQuantities((prev) => ({
+                                    ...prev,
+                                    [stock.id]: Math.min(
+                                      Math.max(1, numValue),
+                                      stock.quantity
+                                    ),
+                                  }));
+                                }}
+                                width="80px"
+                              >
+                                <NumberInputField />
+                                <NumberInputStepper>
+                                  <NumberIncrementStepper />
+                                  <NumberDecrementStepper />
+                                </NumberInputStepper>
+                              </NumberInput>
+                              <Button
+                                size="sm"
+                                colorScheme="red"
+                                onClick={() =>
+                                  handleSell(
+                                    stock,
+                                    sellQuantities[stock.id] || 1
+                                  )
+                                }
+                                isDisabled={!isMarketOpen()}
+                              >
+                                Sell
+                              </Button>
+                            </HStack>
+                          </Td>
+                        </Tr>
+                      ))}
+                    </Tbody>
+                  </Table>
+                </Box>
+              </Box>
             ) : (
               <Box p={8} textAlign="center">
                 <Text color={subTextColor}>

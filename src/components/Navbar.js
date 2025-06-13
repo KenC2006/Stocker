@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import {
   Box,
   Flex,
@@ -39,6 +39,18 @@ import {
   AlertDialogHeader,
   AlertDialogContent,
   AlertDialogOverlay,
+  Select,
+  InputGroup,
+  InputRightElement,
+  Textarea,
+  SimpleGrid,
+  Stack,
+  Collapse,
+  IconButton,
+  Popover,
+  PopoverTrigger,
+  PopoverContent,
+  useBreakpointValue,
 } from "@chakra-ui/react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
@@ -57,13 +69,57 @@ import {
   FaTrash,
   FaKey,
   FaUserEdit,
+  FaEye,
+  FaEyeSlash,
 } from "react-icons/fa";
+import {
+  collection,
+  query,
+  where,
+  getDocs,
+  doc,
+  getDoc,
+  writeBatch,
+  serverTimestamp,
+  increment,
+  deleteDoc,
+  updateDoc,
+} from "firebase/firestore";
+import { db } from "../config/firebase";
+import {
+  getAuth,
+  sendPasswordResetEmail,
+  updateEmail,
+  reauthenticateWithCredential,
+  EmailAuthProvider,
+  updatePassword,
+  deleteUser,
+} from "firebase/auth";
+import { HamburgerIcon, CloseIcon, ChevronDownIcon } from "@chakra-ui/icons";
 
 function Navbar() {
   const { currentUser, logout } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const { colorMode, toggleColorMode } = useColorMode();
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [userInfo, setUserInfo] = useState({
+    firstName: "",
+    lastName: "",
+    major: "",
+    studyYear: "",
+    bio: "",
+    linkedinUrl: "",
+  });
+  const [isEditing, setIsEditing] = useState(false);
+  const [isUpdating, setIsUpdating] = useState(false);
+  const [newEmail, setNewEmail] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
+  const [isChangingEmail, setIsChangingEmail] = useState(false);
+  const [showEmailEdit, setShowEmailEdit] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const {
     isOpen: isHelpOpen,
     onOpen: onHelpOpen,
@@ -79,9 +135,17 @@ function Navbar() {
     onOpen: onDeleteOpen,
     onClose: onDeleteClose,
   } = useDisclosure();
+  const {
+    isOpen: isEmailModalOpen,
+    onOpen: onEmailModalOpen,
+    onClose: onEmailModalClose,
+  } = useDisclosure();
   const cancelRef = React.useRef();
   const toast = useToast();
+  const [isOpen, setIsOpen] = useState(false);
+  const [isAccountModalOpen, setIsAccountModalOpen] = useState(false);
 
+  // Move all useColorModeValue hooks to the top level
   const navBg = useColorModeValue(
     "rgba(255,255,255,0.85)",
     "rgba(26,32,44,0.85)"
@@ -99,6 +163,47 @@ function Navbar() {
   const modalBg = useColorModeValue("white", "gray.800");
   const modalBorder = useColorModeValue("gray.200", "gray.600");
   const inputBg = useColorModeValue("gray.50", "gray.700");
+  const mainTextColor = useColorModeValue("uoft.navy", "white");
+  const subTextColor = useColorModeValue("gray.700", "gray.200");
+  const borderColor = useColorModeValue("gray.200", "gray.700");
+  const formInputBg = useColorModeValue("white", "gray.600");
+  const formInputBorder = useColorModeValue("gray.200", "gray.700");
+  const formInputHoverBorder = useColorModeValue("blue.400", "blue.400");
+  const formInputFocusBorder = useColorModeValue("blue.400", "blue.400");
+  const formInputFocusShadow = "0 0 0 1px var(--chakra-colors-blue-400)";
+  const bioTextBg = useColorModeValue("white", "gray.600");
+
+  useEffect(() => {
+    const fetchUserInfo = async () => {
+      if (!currentUser) return;
+
+      try {
+        const userDoc = await getDoc(doc(db, "users", currentUser.uid));
+        if (userDoc.exists()) {
+          const data = userDoc.data();
+          setUserInfo({
+            firstName: data.firstName || "",
+            lastName: data.lastName || "",
+            major: data.major || "",
+            studyYear: data.studyYear || "",
+            bio: data.bio || "",
+            linkedinUrl: data.linkedinUrl || "",
+          });
+          setNewEmail(currentUser.email || "");
+        }
+      } catch (error) {
+        console.error("Error fetching user info:", error);
+        toast({
+          title: "Error",
+          description: "Failed to load profile information.",
+          status: "error",
+          duration: 3000,
+          isClosable: true,
+        });
+      }
+    };
+    fetchUserInfo();
+  }, [currentUser]);
 
   const handleLogout = async () => {
     try {
@@ -109,18 +214,230 @@ function Navbar() {
     }
   };
 
-  const handleDeleteAccount = () => {
-    toast({
-      title: "Not Implemented",
-      description: "Account deletion functionality is not yet implemented.",
-      status: "info",
-      duration: 3000,
-      isClosable: true,
-    });
-    onDeleteClose();
+  const handleDeleteAccount = async () => {
+    if (!currentUser) return;
+
+    setIsDeleting(true);
+    try {
+      const batch = writeBatch(db);
+      const userRef = doc(db, "users", currentUser.uid);
+
+      // Delete user document
+      batch.delete(userRef);
+
+      // Delete user's stocks
+      const stocksQuery = query(
+        collection(db, "stocks"),
+        where("userId", "==", currentUser.uid)
+      );
+      const stocksSnapshot = await getDocs(stocksQuery);
+      stocksSnapshot.docs.forEach((doc) => {
+        batch.delete(doc.ref);
+      });
+
+      // Delete user's transactions
+      const transactionsQuery = query(
+        collection(db, "transactions"),
+        where("userId", "==", currentUser.uid)
+      );
+      const transactionsSnapshot = await getDocs(transactionsQuery);
+      transactionsSnapshot.docs.forEach((doc) => {
+        batch.delete(doc.ref);
+      });
+
+      // Commit all deletions
+      await batch.commit();
+
+      // Delete the user account
+      await deleteUser(currentUser);
+
+      toast({
+        title: "Account Deleted",
+        description: "Your account has been successfully deleted.",
+        status: "success",
+        duration: 3000,
+        isClosable: true,
+      });
+
+      navigate("/");
+    } catch (error) {
+      console.error("Error deleting account:", error);
+      toast({
+        title: "Error",
+        description: error.message,
+        status: "error",
+        duration: 3000,
+        isClosable: true,
+      });
+    } finally {
+      setIsDeleting(false);
+    }
   };
 
+  const handlePasswordChange = async () => {
+    if (!currentUser) return;
+
+    if (newPassword !== confirmPassword) {
+      toast({
+        title: "Error",
+        description: "Passwords do not match",
+        status: "error",
+        duration: 3000,
+        isClosable: true,
+      });
+      return;
+    }
+
+    setIsChangingPassword(true);
+    try {
+      await updatePassword(currentUser, newPassword);
+      setNewPassword("");
+      setConfirmPassword("");
+      toast({
+        title: "Success",
+        description: "Password updated successfully",
+        status: "success",
+        duration: 3000,
+        isClosable: true,
+      });
+    } catch (error) {
+      console.error("Error changing password:", error);
+      toast({
+        title: "Error",
+        description: error.message,
+        status: "error",
+        duration: 3000,
+        isClosable: true,
+      });
+    } finally {
+      setIsChangingPassword(false);
+    }
+  };
+
+  const handleUpdateInfo = async () => {
+    if (!currentUser) return;
+
+    setIsUpdating(true);
+    try {
+      const batch = writeBatch(db);
+      const userRef = doc(db, "users", currentUser.uid);
+
+      batch.update(userRef, {
+        firstName: userInfo.firstName,
+        lastName: userInfo.lastName,
+        major: userInfo.major,
+        studyYear: userInfo.studyYear,
+        bio: userInfo.bio,
+        linkedinUrl: userInfo.linkedinUrl,
+        lastUpdated: serverTimestamp(),
+      });
+
+      await batch.commit();
+
+      toast({
+        title: "Profile Updated",
+        description: "Your profile information has been updated successfully.",
+        status: "success",
+        duration: 3000,
+        isClosable: true,
+      });
+      setIsEditing(false);
+    } catch (error) {
+      console.error("Error updating profile:", error);
+      toast({
+        title: "Error",
+        description: "Failed to update profile. Please try again.",
+        status: "error",
+        duration: 3000,
+        isClosable: true,
+      });
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
+  const handleEmailChange = async () => {
+    if (!currentUser) return;
+
+    setIsChangingEmail(true);
+    try {
+      const batch = writeBatch(db);
+      const userRef = doc(db, "users", currentUser.uid);
+
+      await updateEmail(currentUser, newEmail);
+      batch.update(userRef, {
+        email: newEmail,
+        lastUpdated: serverTimestamp(),
+      });
+      await batch.commit();
+
+      setNewEmail("");
+      toast({
+        title: "Success",
+        description: "Email updated successfully",
+        status: "success",
+        duration: 3000,
+        isClosable: true,
+      });
+    } catch (error) {
+      console.error("Error changing email:", error);
+      toast({
+        title: "Error",
+        description: error.message,
+        status: "error",
+        duration: 3000,
+        isClosable: true,
+      });
+    } finally {
+      setIsChangingEmail(false);
+    }
+  };
+
+  const studyYears = [
+    "1st Year",
+    "2nd Year",
+    "3rd Year",
+    "4th Year",
+    "Graduate",
+  ];
+
+  const majors = [
+    "Mechanical Engineering",
+    "Computer Engineering",
+    "Electrical Engineering",
+    "Chemical Engineering",
+    "Materials Engineering",
+    "Mineral Engineering",
+    "TrackOne Engineering",
+    "Civil Engineering",
+    "Engineering Science",
+    "Life Science",
+    "Social Science",
+    "Computer Science",
+    "Mathematics",
+    "Physics",
+    "Chemistry",
+    "Biology",
+    "Economics",
+    "Business",
+    "Other",
+  ];
+
   const isActive = (path) => location.pathname === path;
+
+  const tags = [
+    { name: "Mechanical Engineering", color: "blue" },
+    { name: "Computer Engineering", color: "purple" },
+    { name: "Electrical Engineering", color: "orange" },
+    { name: "Chemical Engineering", color: "green" },
+    { name: "Materials Engineering", color: "teal" },
+    { name: "Mineral Engineering", color: "yellow" },
+    { name: "TrackOne Engineering", color: "cyan" },
+    { name: "Civil Engineering", color: "red" },
+    { name: "Engineering Science", color: "pink" },
+    { name: "Life Science", color: "green.500" },
+    { name: "Social Science", color: "purple.500" },
+  ];
 
   return (
     <>
@@ -362,31 +679,317 @@ function Navbar() {
           <ModalCloseButton />
           <ModalBody>
             <VStack spacing={6} align="stretch">
-              <Box>
+              <Box mb={6}>
                 <HStack spacing={3} mb={4}>
-                  <Icon as={FaUserEdit} color="blue.500" boxSize={5} />
-                  <Text fontWeight="bold" color={menuItemTextColor}>
+                  <Icon as={FaUser} color="blue.500" boxSize={5} />
+                  <Heading size="md" color={mainTextColor}>
                     Profile Information
-                  </Text>
+                  </Heading>
                 </HStack>
-                <FormControl>
-                  <FormLabel color={menuItemTextColor}>Display Name</FormLabel>
-                  <Input
-                    placeholder={
-                      currentUser?.displayName || "Set your display name"
-                    }
-                    bg={inputBg}
-                    isDisabled
-                  />
-                </FormControl>
-                <FormControl mt={4}>
-                  <FormLabel color={menuItemTextColor}>Email</FormLabel>
-                  <Input
-                    value={currentUser?.email || ""}
-                    isReadOnly
-                    bg={inputBg}
-                  />
-                </FormControl>
+                <Box
+                  bg={useColorModeValue("gray.50", "gray.700")}
+                  p={6}
+                  borderRadius="lg"
+                  border="1px"
+                  borderColor={borderColor}
+                >
+                  <VStack spacing={6} align="stretch">
+                    <SimpleGrid columns={{ base: 1, md: 2 }} spacing={6}>
+                      <FormControl>
+                        <FormLabel color={subTextColor} fontWeight="medium">
+                          First Name
+                        </FormLabel>
+                        {isEditing ? (
+                          <Input
+                            value={userInfo.firstName}
+                            onChange={(e) =>
+                              setUserInfo({
+                                ...userInfo,
+                                firstName: e.target.value,
+                              })
+                            }
+                            bg={formInputBg}
+                            borderColor={formInputBorder}
+                            _hover={{ borderColor: formInputHoverBorder }}
+                            _focus={{
+                              borderColor: formInputFocusBorder,
+                              boxShadow: formInputFocusShadow,
+                            }}
+                          />
+                        ) : (
+                          <Text
+                            color={mainTextColor}
+                            fontSize="md"
+                            fontWeight="medium"
+                          >
+                            {userInfo.firstName}
+                          </Text>
+                        )}
+                      </FormControl>
+
+                      <FormControl>
+                        <FormLabel color={subTextColor} fontWeight="medium">
+                          Last Name
+                        </FormLabel>
+                        {isEditing ? (
+                          <Input
+                            value={userInfo.lastName}
+                            onChange={(e) =>
+                              setUserInfo({
+                                ...userInfo,
+                                lastName: e.target.value,
+                              })
+                            }
+                            bg={formInputBg}
+                            borderColor={formInputBorder}
+                            _hover={{ borderColor: formInputHoverBorder }}
+                            _focus={{
+                              borderColor: formInputFocusBorder,
+                              boxShadow: formInputFocusShadow,
+                            }}
+                          />
+                        ) : (
+                          <Text
+                            color={mainTextColor}
+                            fontSize="md"
+                            fontWeight="medium"
+                          >
+                            {userInfo.lastName}
+                          </Text>
+                        )}
+                      </FormControl>
+                    </SimpleGrid>
+
+                    <SimpleGrid columns={{ base: 1, md: 2 }} spacing={6}>
+                      <FormControl>
+                        <FormLabel color={subTextColor} fontWeight="medium">
+                          Major
+                        </FormLabel>
+                        {isEditing ? (
+                          <Select
+                            value={userInfo.major}
+                            onChange={(e) =>
+                              setUserInfo({
+                                ...userInfo,
+                                major: e.target.value,
+                              })
+                            }
+                            bg={formInputBg}
+                            borderColor={formInputBorder}
+                            _hover={{ borderColor: formInputHoverBorder }}
+                            _focus={{
+                              borderColor: formInputFocusBorder,
+                              boxShadow: formInputFocusShadow,
+                            }}
+                          >
+                            <option value="">Select Major</option>
+                            <option value="Computer Science">
+                              Computer Science
+                            </option>
+                            <option value="Electrical Engineering">
+                              Electrical Engineering
+                            </option>
+                            <option value="Mechanical Engineering">
+                              Mechanical Engineering
+                            </option>
+                            <option value="Civil Engineering">
+                              Civil Engineering
+                            </option>
+                            <option value="Chemical Engineering">
+                              Chemical Engineering
+                            </option>
+                            <option value="Biomedical Engineering">
+                              Biomedical Engineering
+                            </option>
+                            <option value="Aerospace Engineering">
+                              Aerospace Engineering
+                            </option>
+                            <option value="Industrial Engineering">
+                              Industrial Engineering
+                            </option>
+                            <option value="Environmental Engineering">
+                              Environmental Engineering
+                            </option>
+                            <option value="Materials Science">
+                              Materials Science
+                            </option>
+                            <option value="Biology">Biology</option>
+                            <option value="Chemistry">Chemistry</option>
+                            <option value="Physics">Physics</option>
+                            <option value="Mathematics">Mathematics</option>
+                            <option value="Statistics">Statistics</option>
+                            <option value="Economics">Economics</option>
+                            <option value="Psychology">Psychology</option>
+                            <option value="Sociology">Sociology</option>
+                            <option value="Political Science">
+                              Political Science
+                            </option>
+                            <option value="Business">Business</option>
+                            <option value="Finance">Finance</option>
+                            <option value="Marketing">Marketing</option>
+                            <option value="Accounting">Accounting</option>
+                            <option value="Other">Other</option>
+                          </Select>
+                        ) : (
+                          <Text
+                            color={mainTextColor}
+                            fontSize="md"
+                            fontWeight="medium"
+                          >
+                            {userInfo.major}
+                          </Text>
+                        )}
+                      </FormControl>
+
+                      <FormControl>
+                        <FormLabel color={subTextColor} fontWeight="medium">
+                          Study Year
+                        </FormLabel>
+                        {isEditing ? (
+                          <Select
+                            value={userInfo.studyYear}
+                            onChange={(e) =>
+                              setUserInfo({
+                                ...userInfo,
+                                studyYear: e.target.value,
+                              })
+                            }
+                            bg={formInputBg}
+                            borderColor={formInputBorder}
+                            _hover={{ borderColor: formInputHoverBorder }}
+                            _focus={{
+                              borderColor: formInputFocusBorder,
+                              boxShadow: formInputFocusShadow,
+                            }}
+                          >
+                            <option value="">Select Year</option>
+                            <option value="1st Year">1st Year</option>
+                            <option value="2nd Year">2nd Year</option>
+                            <option value="3rd Year">3rd Year</option>
+                            <option value="4th Year">4th Year</option>
+                            <option value="Graduate">Graduate</option>
+                          </Select>
+                        ) : (
+                          <Text
+                            color={mainTextColor}
+                            fontSize="md"
+                            fontWeight="medium"
+                          >
+                            {userInfo.studyYear}
+                          </Text>
+                        )}
+                      </FormControl>
+                    </SimpleGrid>
+
+                    <FormControl>
+                      <FormLabel color={subTextColor} fontWeight="medium">
+                        Bio
+                      </FormLabel>
+                      {isEditing ? (
+                        <Textarea
+                          value={userInfo.bio}
+                          onChange={(e) =>
+                            setUserInfo({ ...userInfo, bio: e.target.value })
+                          }
+                          placeholder="Tell us about yourself..."
+                          bg={formInputBg}
+                          borderColor={formInputBorder}
+                          _hover={{ borderColor: formInputHoverBorder }}
+                          _focus={{
+                            borderColor: formInputFocusBorder,
+                            boxShadow: formInputFocusShadow,
+                          }}
+                          rows={4}
+                        />
+                      ) : (
+                        <Text
+                          color={mainTextColor}
+                          bg={bioTextBg}
+                          p={4}
+                          borderRadius="md"
+                          whiteSpace="pre-wrap"
+                          fontSize="md"
+                          border="1px"
+                          borderColor={borderColor}
+                        >
+                          {userInfo.bio || "No bio available"}
+                        </Text>
+                      )}
+                    </FormControl>
+
+                    <FormControl>
+                      <FormLabel color={subTextColor} fontWeight="medium">
+                        LinkedIn Profile
+                      </FormLabel>
+                      {isEditing ? (
+                        <Input
+                          value={userInfo.linkedinUrl}
+                          onChange={(e) =>
+                            setUserInfo({
+                              ...userInfo,
+                              linkedinUrl: e.target.value,
+                            })
+                          }
+                          placeholder="https://linkedin.com/in/your-profile"
+                          bg={formInputBg}
+                          borderColor={formInputBorder}
+                          _hover={{ borderColor: formInputHoverBorder }}
+                          _focus={{
+                            borderColor: formInputFocusBorder,
+                            boxShadow: formInputFocusShadow,
+                          }}
+                        />
+                      ) : userInfo.linkedinUrl ? (
+                        <ChakraLink
+                          href={userInfo.linkedinUrl}
+                          isExternal
+                          color="blue.500"
+                          _hover={{ textDecoration: "underline" }}
+                          fontSize="md"
+                        >
+                          <HStack spacing={2}>
+                            <Icon as={FaLinkedin} />
+                            <Text>View LinkedIn Profile</Text>
+                          </HStack>
+                        </ChakraLink>
+                      ) : (
+                        <Text color={subTextColor} fontSize="md">
+                          No LinkedIn profile added
+                        </Text>
+                      )}
+                    </FormControl>
+                  </VStack>
+                </Box>
+
+                {isEditing ? (
+                  <HStack spacing={4} mt={4}>
+                    <Button
+                      colorScheme="blue"
+                      onClick={handleUpdateInfo}
+                      isLoading={isUpdating}
+                      flex={1}
+                    >
+                      Save Changes
+                    </Button>
+                    <Button
+                      variant="outline"
+                      onClick={() => setIsEditing(false)}
+                      flex={1}
+                    >
+                      Cancel
+                    </Button>
+                  </HStack>
+                ) : (
+                  <Button
+                    colorScheme="blue"
+                    variant="outline"
+                    onClick={() => setIsEditing(true)}
+                    mt={4}
+                    width="100%"
+                  >
+                    Edit Information
+                  </Button>
+                )}
               </Box>
 
               <Divider />
@@ -402,7 +1005,7 @@ function Navbar() {
                   width="100%"
                   variant="outline"
                   colorScheme="blue"
-                  isDisabled
+                  onClick={handlePasswordChange}
                 >
                   Change Password
                 </Button>
@@ -417,14 +1020,26 @@ function Navbar() {
                     Danger Zone
                   </Text>
                 </HStack>
-                <Button
-                  width="100%"
-                  colorScheme="red"
-                  variant="outline"
-                  onClick={onDeleteOpen}
-                >
-                  Delete Account
-                </Button>
+                <VStack spacing={4} align="stretch">
+                  <Button
+                    width="100%"
+                    colorScheme="red"
+                    variant="outline"
+                    onClick={onEmailModalOpen}
+                    leftIcon={<Icon as={FaEnvelope} />}
+                  >
+                    Change Email
+                  </Button>
+                  <Button
+                    width="100%"
+                    colorScheme="red"
+                    variant="outline"
+                    onClick={onDeleteOpen}
+                    leftIcon={<Icon as={FaTrash} />}
+                  >
+                    Delete Account
+                  </Button>
+                </VStack>
               </Box>
             </VStack>
           </ModalBody>
@@ -459,13 +1074,82 @@ function Navbar() {
               <Button ref={cancelRef} onClick={onDeleteClose}>
                 Cancel
               </Button>
-              <Button colorScheme="red" onClick={handleDeleteAccount} ml={3}>
+              <Button
+                colorScheme="red"
+                onClick={handleDeleteAccount}
+                ml={3}
+                isLoading={isDeleting}
+              >
                 Delete Account
               </Button>
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialogOverlay>
       </AlertDialog>
+
+      {/* Email Change Confirmation Modal */}
+      <Modal isOpen={isEmailModalOpen} onClose={onEmailModalClose} size="md">
+        <ModalOverlay />
+        <ModalContent bg={modalBg} borderColor={modalBorder} borderWidth="1px">
+          <ModalHeader color={navTextColor}>Change Email</ModalHeader>
+          <ModalCloseButton />
+          <ModalBody>
+            <VStack spacing={4}>
+              <FormControl>
+                <FormLabel>New Email</FormLabel>
+                <Input
+                  value={newEmail}
+                  onChange={(e) => setNewEmail(e.target.value)}
+                  type="email"
+                  placeholder="Enter new email"
+                />
+              </FormControl>
+              <FormControl>
+                <FormLabel>Current Password</FormLabel>
+                <InputGroup>
+                  <Input
+                    type={showPassword ? "text" : "password"}
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    placeholder="Enter your password"
+                  />
+                  <InputRightElement width="3rem">
+                    <Button
+                      h="1.75rem"
+                      size="sm"
+                      onClick={() => setShowPassword(!showPassword)}
+                      variant="ghost"
+                    >
+                      <Icon as={showPassword ? FaEyeSlash : FaEye} />
+                    </Button>
+                  </InputRightElement>
+                </InputGroup>
+              </FormControl>
+            </VStack>
+          </ModalBody>
+          <ModalFooter>
+            <Button
+              colorScheme="blue"
+              onClick={handleEmailChange}
+              isLoading={isUpdating}
+              mr={3}
+              isDisabled={!newEmail || newEmail === userInfo.email}
+            >
+              Confirm Change
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => {
+                onEmailModalClose();
+                setNewPassword("");
+                setNewEmail(userInfo.email);
+              }}
+            >
+              Cancel
+            </Button>
+          </ModalFooter>
+        </ModalContent>
+      </Modal>
     </>
   );
 }
