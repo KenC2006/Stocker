@@ -16,12 +16,30 @@ import {
   Skeleton,
   TableContainer,
   Tag,
+  Modal,
+  ModalOverlay,
+  ModalContent,
+  ModalHeader,
+  ModalBody,
+  ModalCloseButton,
+  useDisclosure,
+  HStack,
+  Avatar,
+  Divider,
+  Icon,
+  Link,
   // leaderboard stuff is perfectly optimized basically, just improve ui maybe
 } from "@chakra-ui/react";
 import { motion } from "framer-motion";
 import { db } from "../config/firebase";
 import { collection, getDocs } from "firebase/firestore";
-import { FaTrophy } from "react-icons/fa";
+import {
+  FaTrophy,
+  FaUser,
+  FaGraduationCap,
+  FaInfoCircle,
+  FaLinkedin,
+} from "react-icons/fa";
 
 const MotionTr = motion(Tr);
 
@@ -29,6 +47,8 @@ function Leaderboard() {
   const [leaderboardData, setLeaderboardData] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [timeLeft, setTimeLeft] = useState(0);
+  const [selectedUser, setSelectedUser] = useState(null);
+  const { isOpen, onOpen, onClose } = useDisclosure();
 
   const headerBgColor = useColorModeValue("gray.50", "gray.700");
   const borderColor = useColorModeValue("gray.200", "gray.700");
@@ -91,6 +111,8 @@ function Leaderboard() {
           lastName: userData.lastName,
           major: userData.major,
           studyYear: userData.studyYear,
+          bio: userData.bio,
+          linkedinUrl: userData.linkedinUrl,
           cash: userData.balance || 0,
           portfolioValue: userData.portfolioValue || 0,
           totalValue: userData.totalValue || 0,
@@ -131,9 +153,14 @@ function Leaderboard() {
     }
   };
 
+  const handleRowClick = (user) => {
+    setSelectedUser(user);
+    onOpen();
+  };
+
   return (
     <Box minH="100vh" bg={pageBgColor}>
-      <Container maxW="7xl" py={10}>
+      <Container maxW="1400px" py={10}>
         <VStack spacing={8}>
           <Box textAlign="center">
             <Heading
@@ -184,8 +211,9 @@ function Leaderboard() {
             border="1px"
             borderColor={borderColor}
             p={{ base: 2, md: 4 }}
+            overflowX="auto"
           >
-            <TableContainer w="100%" overflowX="unset">
+            <TableContainer w="100%">
               <Table variant="simple" w="100%">
                 <Thead>
                   <Tr bg={headerBgColor}>
@@ -242,7 +270,14 @@ function Leaderboard() {
                           </Tr>
                         ))
                     : leaderboardData.map((trader, index) => (
-                        <Tr key={trader.userId} _hover={{ bg: rowHoverBg }}>
+                        <MotionTr
+                          key={trader.userId}
+                          _hover={{ bg: rowHoverBg, cursor: "pointer" }}
+                          onClick={() => handleRowClick(trader)}
+                          initial={{ opacity: 0, y: 20 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ duration: 0.3, delay: index * 0.05 }}
+                        >
                           <Td>
                             <Badge
                               colorScheme={
@@ -352,7 +387,7 @@ function Leaderboard() {
                               {")"}
                             </Badge>
                           </Td>
-                        </Tr>
+                        </MotionTr>
                       ))}
                 </Tbody>
               </Table>
@@ -360,6 +395,134 @@ function Leaderboard() {
           </Box>
         </VStack>
       </Container>
+
+      {/* Profile Modal */}
+      <Modal isOpen={isOpen} onClose={onClose} size="md">
+        <ModalOverlay backdropFilter="blur(10px)" />
+        <ModalContent bg={cardBgColor} borderRadius="xl">
+          <ModalHeader color={mainTextColor}>
+            <HStack spacing={3}>
+              <Avatar
+                name={`${selectedUser?.firstName} ${selectedUser?.lastName}`}
+                bg="blue.500"
+                color="white"
+              />
+              <VStack align="start" spacing={0}>
+                <Text fontSize="xl" fontWeight="bold">
+                  {selectedUser?.firstName} {selectedUser?.lastName}
+                </Text>
+                <Tag
+                  colorScheme={majorColor(selectedUser?.major)}
+                  size="sm"
+                  borderRadius="full"
+                >
+                  {selectedUser?.major}
+                </Tag>
+              </VStack>
+            </HStack>
+          </ModalHeader>
+          <ModalCloseButton />
+          <ModalBody pb={6}>
+            <VStack spacing={4} align="stretch">
+              <HStack spacing={3}>
+                <Icon as={FaGraduationCap} color="blue.500" />
+                <Text color={subTextColor}>{selectedUser?.studyYear}</Text>
+              </HStack>
+
+              {selectedUser?.linkedinUrl && (
+                <HStack spacing={3}>
+                  <Icon as={FaLinkedin} color="blue.500" />
+                  <Link
+                    href={selectedUser.linkedinUrl}
+                    isExternal
+                    color="blue.500"
+                    _hover={{ textDecoration: "underline" }}
+                  >
+                    View LinkedIn Profile
+                  </Link>
+                </HStack>
+              )}
+
+              <Divider />
+
+              <Box>
+                <HStack spacing={3} mb={2}>
+                  <Icon as={FaInfoCircle} color="blue.500" />
+                  <Text fontWeight="bold" color={mainTextColor}>
+                    About
+                  </Text>
+                </HStack>
+                <Text
+                  color={subTextColor}
+                  bg={useColorModeValue("gray.50", "gray.700")}
+                  p={4}
+                  borderRadius="md"
+                  whiteSpace="pre-wrap"
+                >
+                  {selectedUser?.bio || "No bio available"}
+                </Text>
+              </Box>
+
+              <Divider />
+
+              <Box>
+                <HStack spacing={3} mb={2}>
+                  <Icon as={FaTrophy} color="blue.500" />
+                  <Text fontWeight="bold" color={mainTextColor}>
+                    Trading Stats
+                  </Text>
+                </HStack>
+                <VStack spacing={2} align="stretch">
+                  <HStack justify="space-between">
+                    <Text color={subTextColor}>Portfolio Value</Text>
+                    <Text fontWeight="bold" color={mainTextColor}>
+                      $
+                      {selectedUser?.portfolioValue?.toLocaleString(undefined, {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2,
+                      })}
+                    </Text>
+                  </HStack>
+                  <HStack justify="space-between">
+                    <Text color={subTextColor}>Cash Balance</Text>
+                    <Text fontWeight="bold" color={mainTextColor}>
+                      $
+                      {selectedUser?.cash?.toLocaleString(undefined, {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2,
+                      })}
+                    </Text>
+                  </HStack>
+                  <HStack justify="space-between">
+                    <Text color={subTextColor}>Total Gain/Loss</Text>
+                    <Badge
+                      colorScheme={
+                        selectedUser?.gainLoss >= 0 ? "green" : "red"
+                      }
+                      fontSize="sm"
+                      px={2}
+                      py={1}
+                    >
+                      {selectedUser?.gainLoss >= 0 ? "+" : "-"}$
+                      {Math.abs(selectedUser?.gainLoss || 0).toLocaleString(
+                        undefined,
+                        {
+                          minimumFractionDigits: 2,
+                          maximumFractionDigits: 2,
+                        }
+                      )}
+                      {" ("}
+                      {selectedUser?.gainLossPercent >= 0 ? "+" : "-"}
+                      {Math.abs(selectedUser?.gainLossPercent || 0).toFixed(2)}%
+                      {")"}
+                    </Badge>
+                  </HStack>
+                </VStack>
+              </Box>
+            </VStack>
+          </ModalBody>
+        </ModalContent>
+      </Modal>
     </Box>
   );
 }
