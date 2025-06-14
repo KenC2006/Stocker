@@ -40,17 +40,8 @@ import {
   AlertDialogContent,
   AlertDialogOverlay,
   Select,
-  InputGroup,
-  InputRightElement,
   Textarea,
   SimpleGrid,
-  Stack,
-  Collapse,
-  IconButton,
-  Popover,
-  PopoverTrigger,
-  PopoverContent,
-  useBreakpointValue,
 } from "@chakra-ui/react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
@@ -68,9 +59,6 @@ import {
   FaLinkedin,
   FaTrash,
   FaKey,
-  FaUserEdit,
-  FaEye,
-  FaEyeSlash,
 } from "react-icons/fa";
 import {
   collection,
@@ -81,21 +69,9 @@ import {
   getDoc,
   writeBatch,
   serverTimestamp,
-  increment,
-  deleteDoc,
-  updateDoc,
 } from "firebase/firestore";
 import { db } from "../config/firebase";
-import {
-  getAuth,
-  sendPasswordResetEmail,
-  updateEmail,
-  reauthenticateWithCredential,
-  EmailAuthProvider,
-  updatePassword,
-  deleteUser,
-} from "firebase/auth";
-import { HamburgerIcon, CloseIcon, ChevronDownIcon } from "@chakra-ui/icons";
+import { getAuth, sendPasswordResetEmail, deleteUser } from "firebase/auth";
 
 function Navbar() {
   const { currentUser, logout } = useAuth();
@@ -113,13 +89,7 @@ function Navbar() {
   });
   const [isEditing, setIsEditing] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
-  const [newEmail, setNewEmail] = useState("");
-  const [newPassword, setNewPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
-  const [isChangingPassword, setIsChangingPassword] = useState(false);
-  const [isChangingEmail, setIsChangingEmail] = useState(false);
-  const [showEmailEdit, setShowEmailEdit] = useState(false);
-  const [showPassword, setShowPassword] = useState(false);
+
   const {
     isOpen: isHelpOpen,
     onOpen: onHelpOpen,
@@ -135,17 +105,9 @@ function Navbar() {
     onOpen: onDeleteOpen,
     onClose: onDeleteClose,
   } = useDisclosure();
-  const {
-    isOpen: isEmailModalOpen,
-    onOpen: onEmailModalOpen,
-    onClose: onEmailModalClose,
-  } = useDisclosure();
   const cancelRef = React.useRef();
   const toast = useToast();
-  const [isOpen, setIsOpen] = useState(false);
-  const [isAccountModalOpen, setIsAccountModalOpen] = useState(false);
 
-  // Move all useColorModeValue hooks to the top level
   const navBg = useColorModeValue(
     "rgba(255,255,255,0.85)",
     "rgba(26,32,44,0.85)"
@@ -162,7 +124,6 @@ function Navbar() {
   const menuItemTextColor = useColorModeValue("gray.700", "gray.200");
   const modalBg = useColorModeValue("white", "gray.800");
   const modalBorder = useColorModeValue("gray.200", "gray.600");
-  const inputBg = useColorModeValue("gray.50", "gray.700");
   const mainTextColor = useColorModeValue("uoft.navy", "white");
   const subTextColor = useColorModeValue("gray.700", "gray.200");
   const borderColor = useColorModeValue("gray.200", "gray.700");
@@ -189,7 +150,6 @@ function Navbar() {
             bio: data.bio || "",
             linkedinUrl: data.linkedinUrl || "",
           });
-          setNewEmail(currentUser.email || "");
         }
       } catch (error) {
         console.error("Error fetching user info:", error);
@@ -277,31 +237,17 @@ function Navbar() {
   const handlePasswordChange = async () => {
     if (!currentUser) return;
 
-    if (newPassword !== confirmPassword) {
-      toast({
-        title: "Error",
-        description: "Passwords do not match",
-        status: "error",
-        duration: 3000,
-        isClosable: true,
-      });
-      return;
-    }
-
-    setIsChangingPassword(true);
     try {
-      await updatePassword(currentUser, newPassword);
-      setNewPassword("");
-      setConfirmPassword("");
+      await sendPasswordResetEmail(getAuth(), currentUser.email);
       toast({
-        title: "Success",
-        description: "Password updated successfully",
+        title: "Password Reset Email Sent",
+        description: "Please check your email for password reset instructions",
         status: "success",
-        duration: 3000,
+        duration: 5000,
         isClosable: true,
       });
     } catch (error) {
-      console.error("Error changing password:", error);
+      console.error("Error sending password reset email:", error);
       toast({
         title: "Error",
         description: error.message,
@@ -309,8 +255,6 @@ function Navbar() {
         duration: 3000,
         isClosable: true,
       });
-    } finally {
-      setIsChangingPassword(false);
     }
   };
 
@@ -356,88 +300,7 @@ function Navbar() {
     }
   };
 
-  const handleEmailChange = async () => {
-    if (!currentUser) return;
-
-    setIsChangingEmail(true);
-    try {
-      const batch = writeBatch(db);
-      const userRef = doc(db, "users", currentUser.uid);
-
-      await updateEmail(currentUser, newEmail);
-      batch.update(userRef, {
-        email: newEmail,
-        lastUpdated: serverTimestamp(),
-      });
-      await batch.commit();
-
-      setNewEmail("");
-      toast({
-        title: "Success",
-        description: "Email updated successfully",
-        status: "success",
-        duration: 3000,
-        isClosable: true,
-      });
-    } catch (error) {
-      console.error("Error changing email:", error);
-      toast({
-        title: "Error",
-        description: error.message,
-        status: "error",
-        duration: 3000,
-        isClosable: true,
-      });
-    } finally {
-      setIsChangingEmail(false);
-    }
-  };
-
-  const studyYears = [
-    "1st Year",
-    "2nd Year",
-    "3rd Year",
-    "4th Year",
-    "Graduate",
-  ];
-
-  const majors = [
-    "Mechanical Engineering",
-    "Computer Engineering",
-    "Electrical Engineering",
-    "Chemical Engineering",
-    "Materials Engineering",
-    "Mineral Engineering",
-    "TrackOne Engineering",
-    "Civil Engineering",
-    "Engineering Science",
-    "Life Science",
-    "Social Science",
-    "Computer Science",
-    "Mathematics",
-    "Physics",
-    "Chemistry",
-    "Biology",
-    "Economics",
-    "Business",
-    "Other",
-  ];
-
   const isActive = (path) => location.pathname === path;
-
-  const tags = [
-    { name: "Mechanical Engineering", color: "blue" },
-    { name: "Computer Engineering", color: "purple" },
-    { name: "Electrical Engineering", color: "orange" },
-    { name: "Chemical Engineering", color: "green" },
-    { name: "Materials Engineering", color: "teal" },
-    { name: "Mineral Engineering", color: "yellow" },
-    { name: "TrackOne Engineering", color: "cyan" },
-    { name: "Civil Engineering", color: "red" },
-    { name: "Engineering Science", color: "pink" },
-    { name: "Life Science", color: "green.500" },
-    { name: "Social Science", color: "purple.500" },
-  ];
 
   return (
     <>
@@ -1025,15 +888,6 @@ function Navbar() {
                     width="100%"
                     colorScheme="red"
                     variant="outline"
-                    onClick={onEmailModalOpen}
-                    leftIcon={<Icon as={FaEnvelope} />}
-                  >
-                    Change Email
-                  </Button>
-                  <Button
-                    width="100%"
-                    colorScheme="red"
-                    variant="outline"
                     onClick={onDeleteOpen}
                     leftIcon={<Icon as={FaTrash} />}
                   >
@@ -1086,70 +940,6 @@ function Navbar() {
           </AlertDialogContent>
         </AlertDialogOverlay>
       </AlertDialog>
-
-      {/* Email Change Confirmation Modal */}
-      <Modal isOpen={isEmailModalOpen} onClose={onEmailModalClose} size="md">
-        <ModalOverlay />
-        <ModalContent bg={modalBg} borderColor={modalBorder} borderWidth="1px">
-          <ModalHeader color={navTextColor}>Change Email</ModalHeader>
-          <ModalCloseButton />
-          <ModalBody>
-            <VStack spacing={4}>
-              <FormControl>
-                <FormLabel>New Email</FormLabel>
-                <Input
-                  value={newEmail}
-                  onChange={(e) => setNewEmail(e.target.value)}
-                  type="email"
-                  placeholder="Enter new email"
-                />
-              </FormControl>
-              <FormControl>
-                <FormLabel>Current Password</FormLabel>
-                <InputGroup>
-                  <Input
-                    type={showPassword ? "text" : "password"}
-                    value={newPassword}
-                    onChange={(e) => setNewPassword(e.target.value)}
-                    placeholder="Enter your password"
-                  />
-                  <InputRightElement width="3rem">
-                    <Button
-                      h="1.75rem"
-                      size="sm"
-                      onClick={() => setShowPassword(!showPassword)}
-                      variant="ghost"
-                    >
-                      <Icon as={showPassword ? FaEyeSlash : FaEye} />
-                    </Button>
-                  </InputRightElement>
-                </InputGroup>
-              </FormControl>
-            </VStack>
-          </ModalBody>
-          <ModalFooter>
-            <Button
-              colorScheme="blue"
-              onClick={handleEmailChange}
-              isLoading={isUpdating}
-              mr={3}
-              isDisabled={!newEmail || newEmail === userInfo.email}
-            >
-              Confirm Change
-            </Button>
-            <Button
-              variant="outline"
-              onClick={() => {
-                onEmailModalClose();
-                setNewPassword("");
-                setNewEmail(userInfo.email);
-              }}
-            >
-              Cancel
-            </Button>
-          </ModalFooter>
-        </ModalContent>
-      </Modal>
     </>
   );
 }

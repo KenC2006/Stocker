@@ -28,7 +28,9 @@ import {
   Skeleton,
   HStack,
   Flex,
+  Icon,
 } from "@chakra-ui/react";
+import { FaDollarSign, FaChartPie } from "react-icons/fa";
 import { useAuth } from "../contexts/AuthContext";
 import { useLocation } from "react-router-dom";
 import { db } from "../config/firebase";
@@ -46,30 +48,59 @@ import {
 import { fetchStockPrice, fetchStockPrices } from "../services/stockService";
 
 function Trading() {
+  // State
   const [symbol, setSymbol] = useState("");
   const [stockData, setStockData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [quantity, setQuantity] = useState(1);
   const [portfolio, setPortfolio] = useState([]);
-  const [, setLoadingPortfolio] = useState(true);
+  const [loadingPortfolio, setLoadingPortfolio] = useState(true);
   const [userData, setUserData] = useState(null);
   const [sellQuantities, setSellQuantities] = useState({});
-  const location = useLocation();
 
+  // Hooks
   const { currentUser } = useAuth();
   const toast = useToast();
+  const location = useLocation();
 
+  // Theme colors
   const borderColor = useColorModeValue("gray.200", "gray.600");
   const mainTextColor = useColorModeValue("blue.900", "white");
   const subTextColor = useColorModeValue("gray.600", "gray.200");
   const pageBgColor = useColorModeValue("gray.50", "gray.900");
   const cardBgColor = useColorModeValue("white", "gray.800");
   const numberInputBg = useColorModeValue("gray.100", "gray.700");
-
   const stockHeaderBg = useColorModeValue("gray.50", "gray.700");
   const tradingControlsBg = useColorModeValue("gray.50", "gray.700");
   const cardShadow = useColorModeValue("lg", "dark-lg");
+  const balanceGradient = useColorModeValue(
+    "linear(to-r, green.400, green.500)",
+    "linear(to-r, green.500, green.600)"
+  );
+  const portfolioGradient = useColorModeValue(
+    "linear(to-r, blue.400, blue.500)",
+    "linear(to-r, blue.500, blue.600)"
+  );
 
+  // Market status check
+  const isMarketOpen = () => {
+    const now = new Date();
+    const nyNow = new Date(
+      now.toLocaleString("en-US", { timeZone: "America/New_York" })
+    );
+    const day = nyNow.getDay();
+    const hours = nyNow.getHours();
+    const minutes = nyNow.getMinutes();
+
+    if (day === 0 || day === 6) return false;
+    if (hours < 9 || (hours === 9 && minutes < 30)) return false;
+    if (hours > 16 || (hours === 16 && minutes > 0)) return false;
+    return true;
+  };
+
+  const marketOpen = isMarketOpen();
+
+  // Data fetching
   const fetchData = async () => {
     if (!currentUser) return;
 
@@ -137,18 +168,7 @@ function Trading() {
     }
   };
 
-  useEffect(() => {
-    fetchData();
-  }, [currentUser, location.pathname]);
-
-  useEffect(() => {
-    if (!portfolio.length) return;
-
-    const interval = setInterval(fetchData, 60000);
-
-    return () => clearInterval(interval);
-  }, [portfolio.length]);
-
+  // Stock search
   const searchStock = async () => {
     if (!symbol) {
       toast({
@@ -165,12 +185,7 @@ function Trading() {
     try {
       const upperSymbol = symbol.trim().toUpperCase();
       const stockData = await fetchStockPrice(upperSymbol);
-
-      setStockData({
-        symbol: upperSymbol,
-        ...stockData,
-      });
-
+      setStockData({ symbol: upperSymbol, ...stockData });
       toast.closeAll();
     } catch (error) {
       toast({
@@ -186,24 +201,7 @@ function Trading() {
     }
   };
 
-  function isMarketOpen() {
-    const now = new Date();
-
-    const nyNow = new Date(
-      now.toLocaleString("en-US", { timeZone: "America/New_York" })
-    );
-    const day = nyNow.getDay();
-    const hours = nyNow.getHours();
-    const minutes = nyNow.getMinutes();
-
-    if (day === 0 || day === 6) return false;
-    if (hours < 9 || (hours === 9 && minutes < 30)) return false;
-    if (hours > 16 || (hours === 16 && minutes > 0)) return false;
-    return true;
-  }
-
-  const marketOpen = isMarketOpen();
-
+  // Trading handlers
   const handleTrade = async (type) => {
     if (!marketOpen) {
       toast({
@@ -229,9 +227,7 @@ function Trading() {
         }
 
         const userRef = doc(db, "users", currentUser.uid);
-        batch.update(userRef, {
-          balance: userData.balance - cost,
-        });
+        batch.update(userRef, { balance: userData.balance - cost });
 
         const existingStockQuery = query(
           collection(db, "stocks"),
@@ -265,11 +261,7 @@ function Trading() {
         }
 
         await batch.commit();
-
-        setUserData((prev) => ({
-          ...prev,
-          balance: prev.balance - cost,
-        }));
+        setUserData((prev) => ({ ...prev, balance: prev.balance - cost }));
 
         if (existingStockDocs.empty) {
           await fetchData();
@@ -327,35 +319,24 @@ function Trading() {
       const proceeds = priceData.price * sellQuantity;
 
       const batch = writeBatch(db);
-
       const userRef = doc(db, "users", currentUser.uid);
-      batch.update(userRef, {
-        balance: increment(proceeds),
-      });
+      batch.update(userRef, { balance: increment(proceeds) });
 
       const stockRef = doc(db, "stocks", stock.id);
       if (sellQuantity === stock.quantity) {
         batch.delete(stockRef);
       } else {
-        batch.update(stockRef, {
-          quantity: stock.quantity - sellQuantity,
-        });
+        batch.update(stockRef, { quantity: stock.quantity - sellQuantity });
       }
 
       await batch.commit();
-
-      setUserData((prev) => ({
-        ...prev,
-        balance: prev.balance + proceeds,
-      }));
+      setUserData((prev) => ({ ...prev, balance: prev.balance + proceeds }));
 
       setPortfolio((prev) =>
         prev
           .map((s) => {
             if (s.id === stock.id) {
-              if (sellQuantity === s.quantity) {
-                return null;
-              }
+              if (sellQuantity === s.quantity) return null;
               return {
                 ...s,
                 quantity: s.quantity - sellQuantity,
@@ -390,6 +371,25 @@ function Trading() {
     }
   };
 
+  const handleMaxBuy = () => {
+    if (!stockData || !userData) return;
+    const maxQuantity = Math.floor(userData.balance / stockData.price);
+    setQuantity(maxQuantity);
+  };
+
+  // Effects
+  useEffect(() => {
+    if (currentUser) {
+      fetchData();
+    }
+  }, [currentUser, location.pathname]);
+
+  useEffect(() => {
+    if (!portfolio.length) return;
+    const interval = setInterval(fetchData, 60000);
+    return () => clearInterval(interval);
+  }, [portfolio.length]);
+
   useEffect(() => {
     if (!stockData?.symbol) return;
     let isMounted = true;
@@ -412,19 +412,13 @@ function Trading() {
     };
 
     const interval = setInterval(refreshSelectedStock, 60000);
-
     return () => {
       isMounted = false;
       clearInterval(interval);
     };
   }, [stockData?.symbol]);
 
-  const handleMaxBuy = () => {
-    if (!stockData || !userData) return;
-    const maxQuantity = Math.floor(userData.balance / stockData.price);
-    setQuantity(maxQuantity);
-  };
-
+  // Render
   return (
     <Box minH="100vh" bg={pageBgColor} py={8}>
       <Container maxW="1400px">
@@ -441,12 +435,32 @@ function Trading() {
             </Heading>
             <Text color={subTextColor}>Live market trading simulation</Text>
           </VStack>
-          <Box bg={cardBgColor} p={4} borderRadius="lg" boxShadow={cardShadow}>
-            <HStack spacing={8} align="end">
-              <VStack align="end" spacing={1}>
-                <Text color={subTextColor} fontSize="sm">
-                  Available Balance
-                </Text>
+          <HStack spacing={4} width={{ base: "100%", md: "auto" }}>
+            <Box
+              bg={cardBgColor}
+              p={6}
+              borderRadius="xl"
+              boxShadow={cardShadow}
+              position="relative"
+              overflow="hidden"
+              minW="200px"
+              _before={{
+                content: '""',
+                position: "absolute",
+                top: 0,
+                left: 0,
+                right: 0,
+                height: "4px",
+                bgGradient: balanceGradient,
+              }}
+            >
+              <VStack align="start" spacing={2}>
+                <HStack>
+                  <Icon as={FaDollarSign} color="green.400" boxSize={5} />
+                  <Text color={subTextColor} fontSize="sm" fontWeight="medium">
+                    Available Balance
+                  </Text>
+                </HStack>
                 <Text color={mainTextColor} fontSize="2xl" fontWeight="bold">
                   {userData ? (
                     `$${userData.balance?.toLocaleString(undefined, {
@@ -458,11 +472,33 @@ function Trading() {
                   )}
                 </Text>
               </VStack>
+            </Box>
 
-              <VStack align="end" spacing={1}>
-                <Text color={subTextColor} fontSize="sm">
-                  Portfolio Value
-                </Text>
+            <Box
+              bg={cardBgColor}
+              p={6}
+              borderRadius="xl"
+              boxShadow={cardShadow}
+              position="relative"
+              overflow="hidden"
+              minW="200px"
+              _before={{
+                content: '""',
+                position: "absolute",
+                top: 0,
+                left: 0,
+                right: 0,
+                height: "4px",
+                bgGradient: portfolioGradient,
+              }}
+            >
+              <VStack align="start" spacing={2}>
+                <HStack>
+                  <Icon as={FaChartPie} color="blue.400" boxSize={5} />
+                  <Text color={subTextColor} fontSize="sm" fontWeight="medium">
+                    Portfolio Value
+                  </Text>
+                </HStack>
                 <Text color={mainTextColor} fontSize="2xl" fontWeight="bold">
                   {portfolio.length > 0
                     ? `$${portfolio
@@ -478,8 +514,8 @@ function Trading() {
                     : "$0.00"}
                 </Text>
               </VStack>
-            </HStack>
-          </Box>
+            </Box>
+          </HStack>
         </Flex>
 
         <Flex gap={8} direction={{ base: "column", xl: "row" }}>

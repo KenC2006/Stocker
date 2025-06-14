@@ -28,17 +28,23 @@ import {
   Divider,
   Icon,
   Link,
-  // leaderboard stuff is perfectly optimized basically, just improve ui maybe
+  Input,
+  InputGroup,
+  InputLeftElement,
+  Button,
+  Flex,
 } from "@chakra-ui/react";
 import { motion } from "framer-motion";
 import { db } from "../config/firebase";
 import { collection, getDocs } from "firebase/firestore";
 import {
   FaTrophy,
-  FaUser,
   FaGraduationCap,
   FaInfoCircle,
   FaLinkedin,
+  FaSearch,
+  FaChevronLeft,
+  FaChevronRight,
 } from "react-icons/fa";
 
 const MotionTr = motion(Tr);
@@ -48,6 +54,11 @@ function Leaderboard() {
   const [isLoading, setIsLoading] = useState(true);
   const [timeLeft, setTimeLeft] = useState(0);
   const [selectedUser, setSelectedUser] = useState(null);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [filteredData, setFilteredData] = useState([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const usersPerPage = 10;
+
   const { isOpen, onOpen, onClose } = useDisclosure();
 
   const headerBgColor = useColorModeValue("gray.50", "gray.700");
@@ -65,30 +76,18 @@ function Leaderboard() {
   const timerSubColor = useColorModeValue("gray.600", "gray.200");
   const rowHoverBg = useColorModeValue("gray.50", "gray.700");
 
-  useEffect(() => {
-    fetchLeaderboardData();
-  }, []);
-
-  useEffect(() => {
-    const getNextReset = () => {
-      const now = new Date();
-      const torontoNow = new Date(
-        now.toLocaleString("en-US", { timeZone: "America/Toronto" })
-      );
-      const next = new Date(torontoNow);
-      next.setHours(2, 0, 0, 0);
-      if (torontoNow >= next) {
-        next.setDate(next.getDate() + 1);
-      }
-      return next - torontoNow;
-    };
-    const updateTimer = () => {
-      setTimeLeft(getNextReset());
-    };
-    updateTimer();
-    const interval = setInterval(updateTimer, 1000);
-    return () => clearInterval(interval);
-  }, []);
+  const getNextReset = () => {
+    const now = new Date();
+    const torontoNow = new Date(
+      now.toLocaleString("en-US", { timeZone: "America/Toronto" })
+    );
+    const next = new Date(torontoNow);
+    next.setHours(2, 0, 0, 0);
+    if (torontoNow >= next) {
+      next.setDate(next.getDate() + 1);
+    }
+    return next - torontoNow;
+  };
 
   const formatTime = (ms) => {
     let totalSeconds = Math.floor(ms / 1000);
@@ -124,6 +123,7 @@ function Leaderboard() {
       });
       leaderboardEntries.sort((a, b) => b.totalValue - a.totalValue);
       setLeaderboardData(leaderboardEntries);
+      setFilteredData(leaderboardEntries);
     } catch (error) {
       console.error("Error fetching leaderboard data:", error);
     }
@@ -158,11 +158,50 @@ function Leaderboard() {
     onOpen();
   };
 
+  useEffect(() => {
+    fetchLeaderboardData();
+  }, []);
+
+  useEffect(() => {
+    const updateTimer = () => {
+      setTimeLeft(getNextReset());
+    };
+    updateTimer();
+    const interval = setInterval(updateTimer, 1000);
+    return () => clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
+    if (searchTerm.trim() === "") {
+      setFilteredData(leaderboardData);
+    } else {
+      const searchLower = searchTerm.toLowerCase();
+      const filtered = leaderboardData.filter(
+        (user) =>
+          user.firstName.toLowerCase().includes(searchLower) ||
+          user.lastName.toLowerCase().includes(searchLower) ||
+          user.major?.toLowerCase().includes(searchLower) ||
+          user.studyYear?.toLowerCase().includes(searchLower)
+      );
+      setFilteredData(filtered);
+    }
+  }, [searchTerm, leaderboardData]);
+
+  const totalPages = Math.ceil(filteredData.length / usersPerPage);
+  const startIndex = (currentPage - 1) * usersPerPage;
+  const endIndex = startIndex + usersPerPage;
+  const currentUsers = filteredData.slice(startIndex, endIndex);
+
+  const handlePageChange = (newPage) => {
+    setCurrentPage(newPage);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
   return (
     <Box minH="100vh" bg={pageBgColor}>
       <Container maxW="1400px" py={10}>
         <VStack spacing={8}>
-          <Box textAlign="center">
+          <Box textAlign="center" w="100%">
             <Heading
               color={mainTextColor}
               fontSize={{ base: "2xl", md: "4xl" }}
@@ -203,6 +242,27 @@ function Leaderboard() {
               </Text>
             </Box>
           </Box>
+
+          <Box w="100%" maxW="600px">
+            <InputGroup size="lg">
+              <InputLeftElement pointerEvents="none">
+                <Icon as={FaSearch} color="gray.400" />
+              </InputLeftElement>
+              <Input
+                placeholder="Search by name, major, or year..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                bg={cardBgColor}
+                borderColor={borderColor}
+                _hover={{ borderColor: "blue.400" }}
+                _focus={{
+                  borderColor: "blue.500",
+                  boxShadow: "0 0 0 1px blue.500",
+                }}
+              />
+            </InputGroup>
+          </Box>
+
           <Box
             w="100%"
             bg={cardBgColor}
@@ -269,7 +329,7 @@ function Leaderboard() {
                             </Td>
                           </Tr>
                         ))
-                    : leaderboardData.map((trader, index) => (
+                    : currentUsers.map((trader, index) => (
                         <MotionTr
                           key={trader.userId}
                           _hover={{ bg: rowHoverBg, cursor: "pointer" }}
@@ -281,11 +341,11 @@ function Leaderboard() {
                           <Td>
                             <Badge
                               colorScheme={
-                                index === 0
+                                startIndex + index === 0
                                   ? "yellow"
-                                  : index === 1
+                                  : startIndex + index === 1
                                   ? "gray"
-                                  : index === 2
+                                  : startIndex + index === 2
                                   ? "orange"
                                   : "uoft"
                               }
@@ -295,16 +355,16 @@ function Leaderboard() {
                               borderRadius="full"
                               mr={2}
                             >
-                              #{index + 1}
+                              #{startIndex + index + 1}
                             </Badge>
-                            {index < 3 && (
+                            {startIndex + index < 3 && (
                               <FaTrophy
                                 style={{
                                   marginLeft: 4,
                                   color:
-                                    index === 0
+                                    startIndex + index === 0
                                       ? "#FFD700"
-                                      : index === 1
+                                      : startIndex + index === 1
                                       ? "#C0C0C0"
                                       : "#CD7F32",
                                 }}
@@ -392,11 +452,46 @@ function Leaderboard() {
                 </Tbody>
               </Table>
             </TableContainer>
+
+            <Flex justify="center" align="center" mt={6} gap={2}>
+              <Button
+                leftIcon={<FaChevronLeft />}
+                onClick={() => handlePageChange(currentPage - 1)}
+                isDisabled={currentPage === 1}
+                variant="outline"
+                colorScheme="blue"
+              >
+                Previous
+              </Button>
+
+              <HStack spacing={2}>
+                {[...Array(totalPages)].map((_, index) => (
+                  <Button
+                    key={index}
+                    onClick={() => handlePageChange(index + 1)}
+                    colorScheme={currentPage === index + 1 ? "blue" : "gray"}
+                    variant={currentPage === index + 1 ? "solid" : "outline"}
+                    size="sm"
+                  >
+                    {index + 1}
+                  </Button>
+                ))}
+              </HStack>
+
+              <Button
+                rightIcon={<FaChevronRight />}
+                onClick={() => handlePageChange(currentPage + 1)}
+                isDisabled={currentPage === totalPages}
+                variant="outline"
+                colorScheme="blue"
+              >
+                Next
+              </Button>
+            </Flex>
           </Box>
         </VStack>
       </Container>
 
-      {/* Profile Modal */}
       <Modal isOpen={isOpen} onClose={onClose} size="md">
         <ModalOverlay backdropFilter="blur(10px)" />
         <ModalContent bg={cardBgColor} borderRadius="xl">

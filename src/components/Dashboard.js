@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { Link } from "react-router-dom";
 import {
   Box,
   Container,
@@ -10,7 +11,6 @@ import {
   Icon,
   SimpleGrid,
   Stat,
-  StatLabel,
   StatNumber,
   StatHelpText,
   Skeleton,
@@ -24,11 +24,8 @@ import {
   ModalFooter,
   IconButton,
   HStack,
-
-  // optimize api and read write usage at some point
+  Progress,
 } from "@chakra-ui/react";
-import { Link } from "react-router-dom";
-import { useAuth } from "../contexts/AuthContext";
 import {
   FaChartLine,
   FaTrophy,
@@ -49,10 +46,10 @@ import {
   serverTimestamp,
 } from "firebase/firestore";
 import { db } from "../config/firebase";
+import { useAuth } from "../contexts/AuthContext";
 import { fetchStockPrices } from "../services/stockService";
 
 function Dashboard() {
-  const { currentUser } = useAuth();
   const [userData, setUserData] = useState(null);
   const [portfolioStats, setPortfolioStats] = useState({
     totalValue: 0,
@@ -61,18 +58,27 @@ function Dashboard() {
     totalUsers: 0,
   });
   const [loading, setLoading] = useState(true);
-  const bgColor = useColorModeValue("white", "gray.800");
-  const borderColor = useColorModeValue("gray.200", "gray.600");
+
+  const { currentUser } = useAuth();
   const { isOpen, onOpen, onClose } = useDisclosure();
   const {
     isOpen: isAboutOpen,
     onOpen: onAboutOpen,
     onClose: onAboutClose,
   } = useDisclosure();
+
+  const bgColor = useColorModeValue("white", "gray.800");
+  const borderColor = useColorModeValue("gray.200", "gray.600");
   const mainTextColor = useColorModeValue("uoft.navy", "white");
   const subTextColor = useColorModeValue("gray.600", "gray.200");
   const pageBgColor = useColorModeValue("gray.50", "gray.900");
   const iconColor = useColorModeValue("blue.500", "blue.200");
+  const cardShadow = useColorModeValue("lg", "dark-lg");
+  const gradientStart = useColorModeValue("blue.400", "blue.500");
+  const gradientEnd = useColorModeValue("blue.500", "blue.600");
+  const hoverBorderColor = useColorModeValue("blue.400", "blue.300");
+  const cardHoverBg = useColorModeValue("gray.50", "gray.700");
+  const progressBg = useColorModeValue("gray.100", "gray.600");
 
   const calculatePortfolioStats = async (userStocks, cash = 0) => {
     if (!userStocks.length) {
@@ -87,13 +93,11 @@ function Dashboard() {
     const priceMap = await fetchStockPrices(symbols);
 
     let portfolioValue = 0;
-    let initialValue = 0;
 
     userStocks.forEach((stock) => {
       const priceData = priceMap[stock.symbol];
       if (priceData) {
         portfolioValue += priceData.price * stock.quantity;
-        initialValue += stock.purchasePrice * stock.quantity;
       }
     });
 
@@ -112,84 +116,84 @@ function Dashboard() {
     };
   };
 
-  const fetchUserRank = async (userTotalValue) => {
-    try {
-      const usersSnapshot = await getDocs(
-        query(collection(db, "users"), where("totalValue", ">=", 0))
-      );
-
-      const allUsers = usersSnapshot.docs.map((doc) => ({
-        id: doc.id,
-        totalValue: doc.data().totalValue || 0,
-      }));
-
-      allUsers.sort((a, b) => b.totalValue - a.totalValue);
-      const rank =
-        allUsers.findIndex((user) => user.id === currentUser.uid) + 1;
-      const rankData = {
-        rank: rank || allUsers.length,
-        totalUsers: allUsers.length,
-      };
-
-      return rankData;
-    } catch (error) {
-      console.error("Error calculating rank:", error);
-      return { rank: 0, totalUsers: 0 };
-    }
-  };
-
-  const fetchData = async () => {
-    if (!currentUser) return;
-
-    setLoading(true);
-    try {
-      const [userDoc, stocksSnapshot] = await Promise.all([
-        getDoc(doc(db, "users", currentUser.uid)),
-        getDocs(
-          query(
-            collection(db, "stocks"),
-            where("userId", "==", currentUser.uid)
-          )
-        ),
-      ]);
-
-      const userData = userDoc.exists() ? userDoc.data() : null;
-      const cash = userData?.balance || 0;
-      setUserData(userData);
-
-      const userStocks = stocksSnapshot.docs.map((doc) => doc.data());
-
-      const [stats, rankData] = await Promise.all([
-        calculatePortfolioStats(userStocks, cash),
-        fetchUserRank(userData?.totalValue || 0),
-      ]);
-
-      setPortfolioStats({
-        ...stats,
-        ...rankData,
-        cash,
-      });
-
-      const shouldUpdate =
-        Math.abs(stats.totalValue - (userData?.totalValue || 0)) > 1;
-      if (shouldUpdate) {
-        await updateDoc(doc(db, "users", currentUser.uid), {
-          portfolioValue: stats.portfolioValue,
-          totalValue: stats.totalValue,
-          gainLoss: stats.gainLoss,
-          gainLossPercent: stats.gainLossPercent,
-          initialInvestment: 30000,
-          lastUpdate: serverTimestamp(),
-        });
-      }
-    } catch (error) {
-      console.error("Error fetching data:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   useEffect(() => {
+    const fetchUserRank = async (userTotalValue) => {
+      try {
+        const usersSnapshot = await getDocs(
+          query(collection(db, "users"), where("totalValue", ">=", 0))
+        );
+
+        const allUsers = usersSnapshot.docs.map((doc) => ({
+          id: doc.id,
+          totalValue: doc.data().totalValue || 0,
+        }));
+
+        allUsers.sort((a, b) => b.totalValue - a.totalValue);
+        const rank =
+          allUsers.findIndex((user) => user.id === currentUser.uid) + 1;
+        const rankData = {
+          rank: rank || allUsers.length,
+          totalUsers: allUsers.length,
+        };
+
+        return rankData;
+      } catch (error) {
+        console.error("Error calculating rank:", error);
+        return { rank: 0, totalUsers: 0 };
+      }
+    };
+
+    const fetchData = async () => {
+      if (!currentUser) return;
+
+      setLoading(true);
+      try {
+        const [userDoc, stocksSnapshot] = await Promise.all([
+          getDoc(doc(db, "users", currentUser.uid)),
+          getDocs(
+            query(
+              collection(db, "stocks"),
+              where("userId", "==", currentUser.uid)
+            )
+          ),
+        ]);
+
+        const userData = userDoc.exists() ? userDoc.data() : null;
+        const cash = userData?.balance || 0;
+        setUserData(userData);
+
+        const userStocks = stocksSnapshot.docs.map((doc) => doc.data());
+
+        const [stats, rankData] = await Promise.all([
+          calculatePortfolioStats(userStocks, cash),
+          fetchUserRank(userData?.totalValue || 0),
+        ]);
+
+        setPortfolioStats({
+          ...stats,
+          ...rankData,
+          cash,
+        });
+
+        const shouldUpdate =
+          Math.abs(stats.totalValue - (userData?.totalValue || 0)) > 5;
+        if (shouldUpdate) {
+          await updateDoc(doc(db, "users", currentUser.uid), {
+            portfolioValue: stats.portfolioValue,
+            totalValue: stats.totalValue,
+            gainLoss: stats.gainLoss,
+            gainLossPercent: stats.gainLossPercent,
+            initialInvestment: 30000,
+            lastUpdate: serverTimestamp(),
+          });
+        }
+      } catch (error) {
+        console.error("Error fetching data:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
     if (currentUser) {
       fetchData();
     }
@@ -275,6 +279,9 @@ function Dashboard() {
     },
   ];
 
+  const transitionStyles = { transition: "all 0.3s ease" };
+  const buttonTransitionStyles = { transition: "all 0.2s ease" };
+
   return (
     <Box position="relative" minH="100vh" bg={pageBgColor}>
       <Container maxW="container.lg" py={10}>
@@ -299,23 +306,41 @@ function Dashboard() {
                 key={index}
                 bg={bgColor}
                 p={6}
-                borderRadius="lg"
-                boxShadow="xl"
+                borderRadius="xl"
+                boxShadow={cardShadow}
                 border="1px"
                 borderColor={borderColor}
-                transition="all 0.2s"
+                {...transitionStyles}
+                position="relative"
+                overflow="hidden"
                 _hover={{
-                  transform: "translateY(-2px)",
+                  transform: "translateY(-4px)",
                   boxShadow: "2xl",
-                  borderColor: "uoft.navy",
+                  borderColor: hoverBorderColor,
+                  bg: cardHoverBg,
+                }}
+                _before={{
+                  content: '""',
+                  position: "absolute",
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  height: "4px",
+                  bgGradient: `linear(to-r, ${gradientStart}, ${gradientEnd})`,
                 }}
               >
                 <VStack spacing={3} align="stretch">
-                  <Icon as={stat.icon} w={6} h={6} color={iconColor} />
-                  <Stat>
-                    <StatLabel fontSize="sm" color={subTextColor}>
+                  <HStack spacing={2}>
+                    <Icon as={stat.icon} w={6} h={6} color={iconColor} />
+                    <Text
+                      color={subTextColor}
+                      fontSize="sm"
+                      fontWeight="medium"
+                    >
                       {stat.label}
-                    </StatLabel>
+                    </Text>
+                  </HStack>
+                  <Stat>
                     <StatNumber
                       fontSize="2xl"
                       fontWeight="bold"
@@ -324,24 +349,49 @@ function Dashboard() {
                       {loading ? <Skeleton height="20px" /> : stat.value}
                     </StatNumber>
                     {stat.helpText && (
-                      <StatHelpText>{stat.helpText}</StatHelpText>
+                      <StatHelpText fontSize="sm" fontWeight="medium">
+                        {stat.helpText}
+                      </StatHelpText>
                     )}
                   </Stat>
+                  {stat.change !== undefined &&
+                    stat.label !== "Portfolio Value" && (
+                      <Progress
+                        value={Math.abs(stat.change)}
+                        max={100}
+                        size="sm"
+                        colorScheme={stat.change >= 0 ? "green" : "red"}
+                        borderRadius="full"
+                        bg={progressBg}
+                      />
+                    )}
                 </VStack>
               </Box>
             ))}
             <Box
               bg={bgColor}
               p={6}
-              borderRadius="lg"
-              boxShadow="xl"
+              borderRadius="xl"
+              boxShadow={cardShadow}
               border="1px"
               borderColor={borderColor}
-              transition="all 0.2s"
+              {...transitionStyles}
+              position="relative"
+              overflow="hidden"
               _hover={{
-                transform: "translateY(-2px)",
+                transform: "translateY(-4px)",
                 boxShadow: "2xl",
-                borderColor: "uoft.navy",
+                borderColor: hoverBorderColor,
+                bg: cardHoverBg,
+              }}
+              _before={{
+                content: '""',
+                position: "absolute",
+                top: 0,
+                left: 0,
+                right: 0,
+                height: "4px",
+                bgGradient: `linear(to-r, ${gradientStart}, ${gradientEnd})`,
               }}
               display="flex"
               flexDirection="column"
@@ -359,6 +409,11 @@ function Dashboard() {
                 borderRadius="full"
                 px={6}
                 onClick={onOpen}
+                {...buttonTransitionStyles}
+                _hover={{
+                  transform: "translateY(-2px)",
+                  boxShadow: "lg",
+                }}
               >
                 Show More
               </Button>
@@ -368,13 +423,26 @@ function Dashboard() {
           <Box
             bg={bgColor}
             p={8}
-            borderRadius="lg"
-            boxShadow="xl"
+            borderRadius="xl"
+            boxShadow={cardShadow}
             border="1px"
             borderColor={borderColor}
             textAlign="center"
+            {...transitionStyles}
+            position="relative"
+            overflow="hidden"
             _hover={{
-              borderColor: "uoft.navy",
+              borderColor: hoverBorderColor,
+              bg: cardHoverBg,
+            }}
+            _before={{
+              content: '""',
+              position: "absolute",
+              top: 0,
+              left: 0,
+              right: 0,
+              height: "4px",
+              bgGradient: `linear(to-r, ${gradientStart}, ${gradientEnd})`,
             }}
           >
             <VStack spacing={4}>
@@ -396,6 +464,7 @@ function Dashboard() {
                 py={6}
                 fontSize="xl"
                 boxShadow="md"
+                {...buttonTransitionStyles}
                 _hover={{
                   bg: "blue.600",
                   color: "white",
@@ -450,9 +519,9 @@ function Dashboard() {
                     fontWeight="medium"
                     lineHeight="tall"
                   >
-                    This months is standard. All accounts will start with
-                    $30,000. Trade your way to the top before the month is over
-                    and win prizes!
+                    This month's contest is standard. All accounts will start
+                    with $30,000. Trade your way to the top before the month is
+                    over and win prizes!
                   </Text>
 
                   <Box
