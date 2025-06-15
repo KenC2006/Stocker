@@ -292,7 +292,7 @@ function Dashboard() {
               fontSize={{ base: "2xl", md: "4xl" }}
               fontWeight="extrabold"
             >
-              Welcome Back
+              Welcome
               {userData ? `, ${userData.firstName}` : ""}
             </Heading>
             <Text mt={2} color={subTextColor}>

@@ -4,7 +4,8 @@ service cloud.firestore {
     // Allow authenticated users to read all users' data
     match /users/{userId} {
       allow read: if request.auth != null;
-      allow write: if request.auth != null && request.auth.uid == userId;
+      allow create, update: if request.auth != null && request.auth.uid == userId;
+      allow delete: if request.auth != null && request.auth.uid == userId;
     }
     
     // Allow authenticated users to read all stocks
@@ -17,32 +18,14 @@ service cloud.firestore {
         resource.data.userId == request.auth.uid;
     }
 
-    // Allow users to manage their own transactions
+    // Allow authenticated users to read all transactions
+    // But only allow users to modify their own transactions
     match /transactions/{transactionId} {
       allow read: if request.auth != null;
-      allow write: if request.auth != null && 
+      allow create, update: if request.auth != null && 
         request.resource.data.userId == request.auth.uid;
-    }
-
-    // Allow users to manage their own portfolio history
-    match /portfolioHistory/{historyId} {
-      allow read: if request.auth != null;
-      allow write: if request.auth != null && 
-        request.resource.data.userId == request.auth.uid;
-    }
-
-    // Allow users to manage their own notifications
-    match /notifications/{notificationId} {
-      allow read: if request.auth != null;
-      allow write: if request.auth != null && 
-        request.resource.data.userId == request.auth.uid;
-    }
-
-    // Allow users to manage their own settings
-    match /settings/{settingId} {
-      allow read: if request.auth != null;
-      allow write: if request.auth != null && 
-        request.resource.data.userId == request.auth.uid;
+      allow delete: if request.auth != null && 
+        resource.data.userId == request.auth.uid;
     }
   }
-} 
+}
