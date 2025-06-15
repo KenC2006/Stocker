@@ -71,7 +71,15 @@ import {
   serverTimestamp,
 } from "firebase/firestore";
 import { db } from "../config/firebase";
-import { getAuth, sendPasswordResetEmail, deleteUser } from "firebase/auth";
+import {
+  getAuth,
+  sendPasswordResetEmail,
+  deleteUser,
+  GoogleAuthProvider,
+  reauthenticateWithPopup,
+  reauthenticateWithCredential,
+  EmailAuthProvider,
+} from "firebase/auth";
 
 function Navbar() {
   const { currentUser, logout } = useAuth();
@@ -89,6 +97,9 @@ function Navbar() {
   });
   const [isEditing, setIsEditing] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
+  const [reauthPassword, setReauthPassword] = useState("");
+  const [isReauthModalOpen, setIsReauthModalOpen] = useState(false);
+  const [isReauthenticating, setIsReauthenticating] = useState(false);
 
   const {
     isOpen: isHelpOpen,
@@ -174,18 +185,40 @@ function Navbar() {
     }
   };
 
-  const handleDeleteAccount = async () => {
+  const handleDeleteAccount = () => {
     if (!currentUser) return;
+    setIsReauthModalOpen(true);
+  };
 
-    setIsDeleting(true);
+  const confirmReauthAndDelete = async () => {
+    if (!currentUser) return;
+    setIsReauthenticating(true);
     try {
+      const providerData = currentUser.providerData[0];
+      if (providerData && providerData.providerId === "google.com") {
+        const provider = new GoogleAuthProvider();
+        await reauthenticateWithPopup(currentUser, provider);
+      } else if (providerData && providerData.providerId === "password") {
+        if (!reauthPassword) {
+          toast({
+            title: "Password required",
+            description: "Please enter your password to confirm.",
+            status: "error",
+            duration: 3000,
+            isClosable: true,
+          });
+          setIsReauthenticating(false);
+          return;
+        }
+        const credential = EmailAuthProvider.credential(
+          currentUser.email,
+          reauthPassword
+        );
+        await reauthenticateWithCredential(currentUser, credential);
+      }
       const batch = writeBatch(db);
       const userRef = doc(db, "users", currentUser.uid);
-
-      // Delete user document
       batch.delete(userRef);
-
-      // Delete user's stocks
       const stocksQuery = query(
         collection(db, "stocks"),
         where("userId", "==", currentUser.uid)
@@ -194,8 +227,6 @@ function Navbar() {
       stocksSnapshot.docs.forEach((doc) => {
         batch.delete(doc.ref);
       });
-
-      // Delete user's transactions
       const transactionsQuery = query(
         collection(db, "transactions"),
         where("userId", "==", currentUser.uid)
@@ -204,12 +235,13 @@ function Navbar() {
       transactionsSnapshot.docs.forEach((doc) => {
         batch.delete(doc.ref);
       });
-
-      // Commit all deletions
       await batch.commit();
-
-      // Delete the user account
       await deleteUser(currentUser);
+
+      // Close all modals
+      setIsReauthModalOpen(false);
+      onAccountClose();
+      onDeleteClose();
 
       toast({
         title: "Account Deleted",
@@ -219,18 +251,38 @@ function Navbar() {
         isClosable: true,
       });
 
-      navigate("/");
+      // Navigate to login page
+      navigate("/login");
     } catch (error) {
-      console.error("Error deleting account:", error);
-      toast({
-        title: "Error",
-        description: error.message,
-        status: "error",
-        duration: 3000,
-        isClosable: true,
-      });
+      if (error.code === "auth/wrong-password") {
+        toast({
+          title: "Wrong password",
+          description: "The password you entered is incorrect.",
+          status: "error",
+          duration: 3000,
+          isClosable: true,
+        });
+      } else if (error.code === "auth/popup-closed-by-user") {
+        toast({
+          title: "Cancelled",
+          description: "Google re-authentication was cancelled.",
+          status: "error",
+          duration: 3000,
+          isClosable: true,
+        });
+      } else {
+        toast({
+          title: "Error",
+          description: error.message,
+          status: "error",
+          duration: 3000,
+          isClosable: true,
+        });
+      }
+      console.error("Error during re-auth/delete:", error);
     } finally {
-      setIsDeleting(false);
+      setIsReauthenticating(false);
+      setReauthPassword("");
     }
   };
 
@@ -486,10 +538,10 @@ function Navbar() {
                   </Text>
                 </HStack>
                 <ChakraLink
-                  href="mailto:support@uoftstocker.com"
+                  href="mailto:uoftstocker@gmail.com"
                   color="blue.500"
                 >
-                  support@uoftstocker.com
+                  uoftstocker@gmail.com
                 </ChakraLink>
               </Box>
 
@@ -932,7 +984,7 @@ function Navbar() {
                 colorScheme="red"
                 onClick={handleDeleteAccount}
                 ml={3}
-                isLoading={isDeleting}
+                isLoading={isReauthenticating}
               >
                 Delete Account
               </Button>
@@ -940,6 +992,53 @@ function Navbar() {
           </AlertDialogContent>
         </AlertDialogOverlay>
       </AlertDialog>
+
+      {isReauthModalOpen && currentUser && (
+        <Modal
+          isOpen={isReauthModalOpen}
+          onClose={() => setIsReauthModalOpen(false)}
+          isCentered
+        >
+          <ModalOverlay />
+          <ModalContent>
+            <ModalHeader>Confirm Account Deletion</ModalHeader>
+            <ModalCloseButton />
+            <ModalBody>
+              {currentUser.providerData &&
+              currentUser.providerData[0]?.providerId === "password" ? (
+                <VStack spacing={4}>
+                  <Text>
+                    Please enter your password to confirm account deletion.
+                  </Text>
+                  <Input
+                    type="password"
+                    value={reauthPassword}
+                    onChange={(e) => setReauthPassword(e.target.value)}
+                    placeholder="Enter your password"
+                  />
+                </VStack>
+              ) : (
+                <Text>
+                  You'll be asked to re-authenticate with Google before deleting
+                  your account.
+                </Text>
+              )}
+            </ModalBody>
+            <ModalFooter>
+              <Button onClick={() => setIsReauthModalOpen(false)} mr={3}>
+                Cancel
+              </Button>
+              <Button
+                colorScheme="red"
+                onClick={confirmReauthAndDelete}
+                isLoading={isReauthenticating}
+              >
+                Confirm Delete
+              </Button>
+            </ModalFooter>
+          </ModalContent>
+        </Modal>
+      )}
     </>
   );
 }

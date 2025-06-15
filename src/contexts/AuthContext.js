@@ -22,7 +22,12 @@ export function AuthProvider({ children }) {
   }
 
   function login(email, password) {
-    return signInWithEmailAndPassword(auth, email, password);
+    return signInWithEmailAndPassword(auth, email, password).catch((error) => {
+      if (error.code === "auth/invalid-credential") {
+        throw new Error("Invalid email or password");
+      }
+      throw error;
+    });
   }
 
   function logout() {
