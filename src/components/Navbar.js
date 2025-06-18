@@ -86,7 +86,6 @@ function Navbar() {
   const navigate = useNavigate();
   const location = useLocation();
   const { colorMode, toggleColorMode } = useColorMode();
-  const [isDeleting, setIsDeleting] = useState(false);
   const [userInfo, setUserInfo] = useState({
     firstName: "",
     lastName: "",
