@@ -48,7 +48,6 @@ import {
 import { fetchStockPrice, fetchStockPrices } from "../services/stockService";
 
 function Trading() {
-  // State
   const [symbol, setSymbol] = useState("");
   const [stockData, setStockData] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -58,12 +57,10 @@ function Trading() {
   const [userData, setUserData] = useState(null);
   const [sellQuantities, setSellQuantities] = useState({});
 
-  // Hooks
   const { currentUser } = useAuth();
   const toast = useToast();
   const location = useLocation();
 
-  // Theme colors
   const borderColor = useColorModeValue("gray.200", "gray.600");
   const mainTextColor = useColorModeValue("blue.900", "white");
   const subTextColor = useColorModeValue("gray.600", "gray.200");
@@ -82,7 +79,6 @@ function Trading() {
     "linear(to-r, blue.500, blue.600)"
   );
 
-  // Market status check
   const isMarketOpen = () => {
     const now = new Date();
     const nyNow = new Date(
@@ -100,7 +96,6 @@ function Trading() {
 
   const marketOpen = isMarketOpen();
 
-  // Data fetching
   const fetchData = async () => {
     if (!currentUser) return;
 
@@ -168,7 +163,6 @@ function Trading() {
     }
   };
 
-  // Stock search
   const searchStock = async () => {
     if (!symbol) {
       toast({
@@ -201,7 +195,6 @@ function Trading() {
     }
   };
 
-  // Trading handlers
   const handleTrade = async (type) => {
     if (!marketOpen) {
       toast({
@@ -377,7 +370,6 @@ function Trading() {
     setQuantity(maxQuantity);
   };
 
-  // Effects
   useEffect(() => {
     if (currentUser) {
       fetchData();
