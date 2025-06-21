@@ -129,7 +129,6 @@ function Navbar() {
     "linear(to-r, blue.700, blue.900)"
   );
   const navButtonHover = useColorModeValue("blue.600", "blue.400");
-  const menuButtonHoverBg = useColorModeValue("gray.100", "gray.700");
   const navTextColor = useColorModeValue("uoft.navy", "white");
   const menuItemTextColor = useColorModeValue("gray.700", "gray.200");
   const modalBg = useColorModeValue("white", "gray.800");
@@ -455,7 +454,14 @@ function Navbar() {
                     px={2}
                     py={2}
                     bg="transparent"
-                    _hover={{ bg: menuButtonHoverBg }}
+                    _hover={{}}
+                    _focus={{}}
+                    _active={{}}
+                    _dark={{
+                      _hover: {},
+                      _focus: {},
+                      _active: {},
+                    }}
                     minW={0}
                   >
                     <Avatar

@@ -71,7 +71,7 @@ function Leaderboard() {
     "linear(to-r, blue.100, blue.300)",
     "linear(to-r, blue.700, blue.900)"
   );
-  const timerNumberColor = useColorModeValue("blue.800", "yellow.200");
+  const timerNumberColor = useColorModeValue("blue.800", "white");
   const timerLabelColor = useColorModeValue("uoft.navy", "white");
   const timerSubColor = useColorModeValue("gray.600", "gray.200");
   const rowHoverBg = useColorModeValue("gray.50", "gray.700");
