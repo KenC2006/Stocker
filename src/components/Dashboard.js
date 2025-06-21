@@ -25,6 +25,8 @@ import {
   IconButton,
   HStack,
   Progress,
+  Badge,
+  Divider,
 } from "@chakra-ui/react";
 import {
   FaChartLine,
@@ -34,6 +36,9 @@ import {
   FaQuestionCircle,
   FaWallet,
   FaDollarSign,
+  FaClock,
+  FaCalendarAlt,
+  FaMedal,
 } from "react-icons/fa";
 import {
   doc,
@@ -58,6 +63,12 @@ function Dashboard() {
     totalUsers: 0,
   });
   const [loading, setLoading] = useState(true);
+  const [contestTimer, setContestTimer] = useState({
+    days: 0,
+    hours: 0,
+    minutes: 0,
+    seconds: 0,
+  });
 
   const { currentUser } = useAuth();
   const { isOpen, onOpen, onClose } = useDisclosure();
@@ -79,6 +90,49 @@ function Dashboard() {
   const hoverBorderColor = useColorModeValue("blue.400", "blue.300");
   const cardHoverBg = useColorModeValue("gray.50", "gray.700");
   const progressBg = useColorModeValue("gray.100", "gray.600");
+
+  const calculateContestTimer = () => {
+    const now = new Date();
+    const endOfMonth = new Date(
+      now.getFullYear(),
+      now.getMonth() + 1,
+      0,
+      23,
+      59,
+      59
+    );
+    const timeLeft = endOfMonth - now;
+
+    if (timeLeft > 0) {
+      const days = Math.floor(timeLeft / (1000 * 60 * 60 * 24));
+      const hours = Math.floor(
+        (timeLeft % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60)
+      );
+      const minutes = Math.floor((timeLeft % (1000 * 60 * 60)) / (1000 * 60));
+      const seconds = Math.floor((timeLeft % (1000 * 60)) / 1000);
+
+      setContestTimer({ days, hours, minutes, seconds });
+    } else {
+      setContestTimer({ days: 0, hours: 0, minutes: 0, seconds: 0 });
+    }
+  };
+
+  useEffect(() => {
+    calculateContestTimer();
+    const timer = setInterval(calculateContestTimer, 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  // Auto-open contest modal when component mounts
+  useEffect(() => {
+    if (!loading) {
+      const hasSeenModal = localStorage.getItem("contestModalSeen");
+      if (!hasSeenModal) {
+        onOpen();
+        localStorage.setItem("contestModalSeen", "true");
+      }
+    }
+  }, [loading, onOpen]);
 
   const calculatePortfolioStats = async (userStocks, cash = 0) => {
     if (!userStocks.length) {
@@ -488,42 +542,214 @@ function Dashboard() {
               borderRadius="2xl"
               boxShadow="2xl"
               bg={bgColor}
-              p={6}
+              p={0}
               mx={4}
-              bgGradient={useColorModeValue(
-                "linear(to-br, white, blue.50)",
-                "linear(to-br, gray.800, blue.900)"
-              )}
+              overflow="hidden"
+              maxH="90vh"
             >
-              <ModalHeader
-                color={mainTextColor}
-                fontWeight="extrabold"
-                fontSize="3xl"
-                textAlign="center"
-                pb={2}
+              {/* Header with gradient background */}
+              <Box
                 bgGradient={useColorModeValue(
                   "linear(to-r, blue.600, purple.600)",
-                  "linear(to-r, blue.200, purple.200)"
+                  "linear(to-r, blue.700, purple.700)"
                 )}
-                bgClip="text"
+                p={6}
+                position="relative"
+                overflow="hidden"
+                _before={{
+                  content: '""',
+                  position: "absolute",
+                  top: "-50%",
+                  left: "-50%",
+                  width: "200%",
+                  height: "200%",
+                  backgroundImage:
+                    "radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 60%)",
+                  opacity: 0.3,
+                }}
               >
-                🏆 Trading Contest
-              </ModalHeader>
-              <ModalCloseButton size="lg" color={mainTextColor} />
-              <ModalBody>
-                <VStack spacing={6} align="stretch">
-                  <Text
-                    fontSize="lg"
-                    color={mainTextColor}
+                <VStack spacing={4} position="relative" zIndex={1}>
+                  <Heading
+                    color="white"
+                    fontWeight="extrabold"
+                    fontSize="3xl"
                     textAlign="center"
-                    fontWeight="medium"
-                    lineHeight="tall"
                   >
-                    This month's contest is standard. All accounts will start
-                    with $30,000. Trade your way to the top before the month is
-                    over and win prizes!
-                  </Text>
+                    🏆 Monthly Trading Contest
+                  </Heading>
+                  <Badge
+                    colorScheme="yellow"
+                    variant="solid"
+                    px={4}
+                    py={2}
+                    borderRadius="full"
+                    fontSize="md"
+                    fontWeight="bold"
+                  >
+                    Kickoff Contest
+                  </Badge>
+                </VStack>
+                <ModalCloseButton
+                  size="lg"
+                  color="white"
+                  _hover={{ bg: "whiteAlpha.200" }}
+                  position="absolute"
+                  top={4}
+                  right={4}
+                />
+              </Box>
 
+              <ModalBody p={6} maxH="70vh" overflowY="auto">
+                <VStack spacing={6} align="stretch">
+                  {/* Countdown Timer */}
+                  <Box
+                    bg={useColorModeValue("blue.50", "blue.900")}
+                    p={6}
+                    borderRadius="2xl"
+                    border="2px"
+                    borderColor={useColorModeValue("blue.200", "blue.700")}
+                    textAlign="center"
+                  >
+                    <HStack spacing={3} mb={4} justify="center">
+                      <Icon as={FaClock} color="blue.500" w={6} h={6} />
+                      <Text
+                        fontWeight="bold"
+                        fontSize="xl"
+                        color={mainTextColor}
+                      >
+                        Contest Ends In
+                      </Text>
+                    </HStack>
+
+                    <SimpleGrid columns={4} spacing={4} mb={4}>
+                      <VStack spacing={2}>
+                        <Box
+                          bg="blue.500"
+                          color="white"
+                          p={3}
+                          borderRadius="xl"
+                          fontWeight="bold"
+                          fontSize="2xl"
+                          minW="60px"
+                        >
+                          {contestTimer.days}
+                        </Box>
+                        <Text
+                          fontSize="sm"
+                          color={subTextColor}
+                          fontWeight="medium"
+                        >
+                          Days
+                        </Text>
+                      </VStack>
+                      <VStack spacing={2}>
+                        <Box
+                          bg="blue.500"
+                          color="white"
+                          p={3}
+                          borderRadius="xl"
+                          fontWeight="bold"
+                          fontSize="2xl"
+                          minW="60px"
+                        >
+                          {contestTimer.hours.toString().padStart(2, "0")}
+                        </Box>
+                        <Text
+                          fontSize="sm"
+                          color={subTextColor}
+                          fontWeight="medium"
+                        >
+                          Hours
+                        </Text>
+                      </VStack>
+                      <VStack spacing={2}>
+                        <Box
+                          bg="blue.500"
+                          color="white"
+                          p={3}
+                          borderRadius="xl"
+                          fontWeight="bold"
+                          fontSize="2xl"
+                          minW="60px"
+                        >
+                          {contestTimer.minutes.toString().padStart(2, "0")}
+                        </Box>
+                        <Text
+                          fontSize="sm"
+                          color={subTextColor}
+                          fontWeight="medium"
+                        >
+                          Minutes
+                        </Text>
+                      </VStack>
+                      <VStack spacing={2}>
+                        <Box
+                          bg="blue.500"
+                          color="white"
+                          p={3}
+                          borderRadius="xl"
+                          fontWeight="bold"
+                          fontSize="2xl"
+                          minW="60px"
+                        >
+                          {contestTimer.seconds.toString().padStart(2, "0")}
+                        </Box>
+                        <Text
+                          fontSize="sm"
+                          color={subTextColor}
+                          fontWeight="medium"
+                        >
+                          Seconds
+                        </Text>
+                      </VStack>
+                    </SimpleGrid>
+
+                    <Progress
+                      value={(contestTimer.days / 31) * 100}
+                      colorScheme="blue"
+                      size="lg"
+                      borderRadius="full"
+                      bg={useColorModeValue("blue.100", "blue.800")}
+                    />
+                    <Text fontSize="sm" color={subTextColor} mt={2}>
+                      {contestTimer.days} days remaining in this month's contest
+                    </Text>
+                  </Box>
+
+                  {/* Contest Overview */}
+                  <Box
+                    bg={useColorModeValue("gray.50", "gray.700")}
+                    p={6}
+                    borderRadius="2xl"
+                    border="1px"
+                    borderColor={useColorModeValue("gray.200", "gray.600")}
+                  >
+                    <HStack spacing={3} mb={4}>
+                      <Icon as={FaCalendarAlt} color="blue.500" w={6} h={6} />
+                      <Text
+                        fontWeight="bold"
+                        fontSize="xl"
+                        color={mainTextColor}
+                      >
+                        Contest Overview
+                      </Text>
+                    </HStack>
+                    <Text
+                      fontSize="lg"
+                      color={subTextColor}
+                      lineHeight="tall"
+                      textAlign="center"
+                    >
+                      This month's contest marks the beginning of Stocker! To
+                      keep things simple, no rules will be imposed. All
+                      participants will start with $30,000 in virtual cash.
+                      Trade your way to the top and compete for amazing prizes!
+                      Whoever has the highest portfolio value at the end of the
+                      month (June 30th) wins!.
+                    </Text>
+                  </Box>
+
+                  {/* Rules Section */}
                   <Box
                     bg="uoft.navy"
                     color="white"
@@ -544,129 +770,224 @@ function Dashboard() {
                       opacity: 0.5,
                     }}
                   >
-                    <HStack spacing={3} mb={4}>
+                    <HStack spacing={3} mb={4} position="relative" zIndex={1}>
                       <Icon as={FaChartLine} w={6} h={6} />
                       <Text fontWeight="bold" fontSize="xl">
-                        Rules
+                        Contest Rules
                       </Text>
                     </HStack>
-                    <VStack align="stretch" spacing={3} position="relative">
-                      <HStack spacing={4}>
-                        <Box w={1} h={6} bg="blue.300" borderRadius="full" />
-                        <Text>Start with $30,000 in virtual cash</Text>
-                      </HStack>
-                      <HStack spacing={4}>
-                        <Box w={1} h={6} bg="blue.300" borderRadius="full" />
-                        <Text>Buy and sell real stocks with live prices</Text>
-                      </HStack>
-                      <HStack spacing={4}>
-                        <Box w={1} h={6} bg="blue.300" borderRadius="full" />
-                        <Text>
-                          Top traders win prizes at the end of the contest
+                    <VStack
+                      align="stretch"
+                      spacing={4}
+                      position="relative"
+                      zIndex={1}
+                    >
+                      <HStack
+                        spacing={4}
+                        p={3}
+                        bg="whiteAlpha.100"
+                        borderRadius="xl"
+                      >
+                        <Box w={2} h={2} bg="blue.300" borderRadius="full" />
+                        <Text fontWeight="medium">
+                          Start with $30,000 in virtual cash
                         </Text>
                       </HStack>
-                      <HStack spacing={4}>
-                        <Box w={1} h={6} bg="blue.300" borderRadius="full" />
-                        <Text>
-                          No real money is involved - Winners will be contacted
-                          by the end of the contest via Gmail
+                      <HStack
+                        spacing={4}
+                        p={3}
+                        bg="whiteAlpha.100"
+                        borderRadius="xl"
+                      >
+                        <Box w={2} h={2} bg="blue.300" borderRadius="full" />
+                        <Text fontWeight="medium">
+                          Buy and sell real stocks with live market prices
+                        </Text>
+                      </HStack>
+                      <HStack
+                        spacing={4}
+                        p={3}
+                        bg="whiteAlpha.100"
+                        borderRadius="xl"
+                      >
+                        <Box w={2} h={2} bg="blue.300" borderRadius="full" />
+                        <Text fontWeight="medium">
+                          Leaderboard is updated daily at 2:00 AM Toronto time
+                        </Text>
+                      </HStack>
+                      <HStack
+                        spacing={4}
+                        p={3}
+                        bg="whiteAlpha.100"
+                        borderRadius="xl"
+                      >
+                        <Box w={2} h={2} bg="blue.300" borderRadius="full" />
+                        <Text fontWeight="medium">
+                          Winners contacted via email at contest end
                         </Text>
                       </HStack>
                     </VStack>
                   </Box>
 
+                  {/* Prizes Section */}
                   <Box
-                    bg="uoft.lightBlue"
-                    color="white"
+                    bg={useColorModeValue("purple.50", "purple.900")}
                     p={6}
                     borderRadius="2xl"
-                    boxShadow="lg"
-                    position="relative"
-                    overflow="hidden"
-                    _before={{
-                      content: '""',
-                      position: "absolute",
-                      top: "-50%",
-                      left: "-50%",
-                      width: "200%",
-                      height: "200%",
-                      backgroundImage:
-                        "radial-gradient(circle, rgba(255,255,255,0.2) 0%, transparent 60%)",
-                      opacity: 0.5,
-                    }}
+                    border="2px"
+                    borderColor={useColorModeValue("purple.200", "purple.700")}
                   >
-                    <HStack spacing={3} mb={4}>
-                      <Icon as={FaTrophy} w={6} h={6} />
-                      <Text fontWeight="bold" fontSize="xl">
+                    <HStack spacing={3} mb={6} justify="center">
+                      <Icon as={FaTrophy} color="purple.500" w={6} h={6} />
+                      <Text
+                        fontWeight="bold"
+                        fontSize="xl"
+                        color={mainTextColor}
+                      >
                         Prizes
                       </Text>
                     </HStack>
-                    <VStack align="stretch" spacing={6}>
+                    <VStack spacing={4}>
                       <HStack
                         spacing={4}
                         p={4}
-                        bg="whiteAlpha.200"
+                        bg={useColorModeValue("white", "gray.800")}
                         borderRadius="xl"
+                        boxShadow="md"
+                        w="100%"
+                        border="1px"
+                        borderColor={useColorModeValue(
+                          "purple.200",
+                          "purple.600"
+                        )}
                         _hover={{
                           transform: "translateY(-2px)",
                           boxShadow: "lg",
                         }}
                         transition="all 0.2s"
                       >
-                        <Icon as={FaTrophy} color="yellow.300" w={8} h={8} />
-                        <VStack align="start" spacing={0}>
-                          <Text fontWeight="bold" fontSize="lg">
+                        <Icon as={FaMedal} color="yellow.400" w={8} h={8} />
+                        <VStack align="start" spacing={1} flex={1}>
+                          <Text
+                            fontWeight="bold"
+                            fontSize="lg"
+                            color={mainTextColor}
+                          >
                             1st Place
                           </Text>
-                          <Text fontSize="xl" fontWeight="extrabold">
+                          <Text
+                            fontSize="xl"
+                            fontWeight="extrabold"
+                            color={useColorModeValue(
+                              "purple.600",
+                              "purple.300"
+                            )}
+                          >
                             $50 Amazon Gift Card
                           </Text>
                         </VStack>
+                        <Badge
+                          colorScheme="yellow"
+                          variant="solid"
+                          px={3}
+                          py={1}
+                        >
+                          GOLD
+                        </Badge>
                       </HStack>
                       <HStack
                         spacing={4}
                         p={4}
-                        bg="whiteAlpha.200"
+                        bg={useColorModeValue("white", "gray.800")}
                         borderRadius="xl"
+                        boxShadow="md"
+                        w="100%"
+                        border="1px"
+                        borderColor={useColorModeValue(
+                          "purple.200",
+                          "purple.600"
+                        )}
                         _hover={{
                           transform: "translateY(-2px)",
                           boxShadow: "lg",
                         }}
                         transition="all 0.2s"
                       >
-                        <Icon as={FaTrophy} color="gray.300" w={7} h={7} />
-                        <VStack align="start" spacing={0}>
-                          <Text fontWeight="bold" fontSize="lg">
+                        <Icon as={FaMedal} color="gray.400" w={7} h={7} />
+                        <VStack align="start" spacing={1} flex={1}>
+                          <Text
+                            fontWeight="bold"
+                            fontSize="lg"
+                            color={mainTextColor}
+                          >
                             2nd Place
                           </Text>
-                          <Text fontSize="xl" fontWeight="extrabold">
+                          <Text
+                            fontSize="xl"
+                            fontWeight="extrabold"
+                            color={useColorModeValue(
+                              "purple.600",
+                              "purple.300"
+                            )}
+                          >
                             $25 Amazon Gift Card
                           </Text>
                         </VStack>
+                        <Badge colorScheme="gray" variant="solid" px={3} py={1}>
+                          SILVER
+                        </Badge>
                       </HStack>
                       <HStack
                         spacing={4}
                         p={4}
-                        bg="whiteAlpha.200"
+                        bg={useColorModeValue("white", "gray.800")}
                         borderRadius="xl"
+                        boxShadow="md"
+                        w="100%"
+                        border="1px"
+                        borderColor={useColorModeValue(
+                          "purple.200",
+                          "purple.600"
+                        )}
                         _hover={{
                           transform: "translateY(-2px)",
                           boxShadow: "lg",
                         }}
                         transition="all 0.2s"
                       >
-                        <Icon as={FaTrophy} color="orange.300" w={6} h={6} />
-                        <VStack align="start" spacing={0}>
-                          <Text fontWeight="bold" fontSize="lg">
+                        <Icon as={FaMedal} color="orange.400" w={6} h={6} />
+                        <VStack align="start" spacing={1} flex={1}>
+                          <Text
+                            fontWeight="bold"
+                            fontSize="lg"
+                            color={mainTextColor}
+                          >
                             3rd Place
                           </Text>
-                          <Text fontSize="xl" fontWeight="extrabold">
+                          <Text
+                            fontSize="xl"
+                            fontWeight="extrabold"
+                            color={useColorModeValue(
+                              "purple.600",
+                              "purple.300"
+                            )}
+                          >
                             $10 Amazon Gift Card
                           </Text>
                         </VStack>
+                        <Badge
+                          colorScheme="orange"
+                          variant="solid"
+                          px={3}
+                          py={1}
+                        >
+                          BRONZE
+                        </Badge>
                       </HStack>
                     </VStack>
                   </Box>
+
+                  <Divider />
 
                   <Text
                     fontSize="sm"
@@ -674,11 +995,16 @@ function Dashboard() {
                     textAlign="center"
                     fontStyle="italic"
                   >
-                    For more details, contact organizers
+                    Good luck! Trade wisely and may the best portfolio win! 🚀
                   </Text>
                 </VStack>
               </ModalBody>
-              <ModalFooter justifyContent="center" pt={6}>
+
+              <ModalFooter
+                justifyContent="center"
+                p={6}
+                bg={useColorModeValue("gray.50", "gray.800")}
+              >
                 <Button
                   colorScheme="blue"
                   size="lg"
@@ -730,8 +1056,9 @@ function Dashboard() {
               UofT Stocker is a simulated stock trading platform designed for
               University of Toronto students. Compete with your peers, manage a
               virtual portfolio, and climb the leaderboard. Each month features
-              a unique contest to see who can grow their portfolio the most. Aim
-              for the top and earn rewards—click on "Contest Info" for details.
+              a unique contest with new rules to see who can grow their
+              portfolio the most. Aim for the top and earn rewards—click on
+              "Contest Info" for details.
             </Text>
           </ModalBody>
         </ModalContent>
