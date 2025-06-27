@@ -123,7 +123,7 @@ function Trading() {
       const uniqueSymbols = [
         ...new Set(stocksRaw.map((stock) => stock.symbol)),
       ];
-      const priceMap = await fetchStockPrices(uniqueSymbols);
+      const priceMap = await fetchStockPrices(uniqueSymbols, true);
 
       const stocks = stocksRaw.map((stock) => {
         const priceData = priceMap[stock.symbol];
@@ -178,7 +178,7 @@ function Trading() {
     setLoading(true);
     try {
       const upperSymbol = symbol.trim().toUpperCase();
-      const stockData = await fetchStockPrice(upperSymbol);
+      const stockData = await fetchStockPrice(upperSymbol, false);
       setStockData({ symbol: upperSymbol, ...stockData });
       toast.closeAll();
     } catch (error) {
@@ -378,7 +378,7 @@ function Trading() {
 
   useEffect(() => {
     if (!portfolio.length) return;
-    const interval = setInterval(fetchData, 60000);
+    const interval = setInterval(fetchData, 30000);
     return () => clearInterval(interval);
   }, [portfolio.length]);
 
@@ -388,7 +388,7 @@ function Trading() {
 
     const refreshSelectedStock = async () => {
       try {
-        const priceData = await fetchStockPrice(stockData.symbol);
+        const priceData = await fetchStockPrice(stockData.symbol, true);
         if (!isMounted) return;
 
         setStockData((prev) => ({
@@ -403,7 +403,7 @@ function Trading() {
       }
     };
 
-    const interval = setInterval(refreshSelectedStock, 60000);
+    const interval = setInterval(refreshSelectedStock, 30000);
     return () => {
       isMounted = false;
       clearInterval(interval);
@@ -587,7 +587,9 @@ function Trading() {
                           </Badge>
                         </HStack>
                         <Text fontSize="sm" color={subTextColor}>
-                          Last Updated: {new Date().toLocaleTimeString()}
+                          Last Updated:{" "}
+                          {stockData.timestamp ||
+                            new Date().toLocaleTimeString()}
                         </Text>
                       </VStack>
                       <Text

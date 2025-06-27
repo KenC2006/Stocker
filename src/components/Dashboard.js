@@ -829,7 +829,6 @@ function Dashboard() {
                     </VStack>
                   </Box>
 
-                  {/* Prizes Section */}
                   <Box
                     bg={useColorModeValue("purple.50", "purple.900")}
                     p={6}

@@ -2,7 +2,6 @@ import axios from "axios";
 
 // Global cache and rate limiting
 const priceCache = new Map();
-const CACHE_DURATION = 60000;
 let apiCallsCount = 0;
 let lastResetTime = Date.now();
 const API_CALL_LIMIT = 60;
@@ -26,22 +25,22 @@ const checkRateLimit = () => {
 
 const getCachedPrice = (stockSymbol) => {
   const cached = priceCache.get(stockSymbol);
-  if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
-    return cached.data;
-  }
-  return null;
+  return cached ? cached.data : null;
 };
 
-export const fetchStockPrice = async (stockSymbol) => {
+export const fetchStockPrice = async (stockSymbol, forceRefresh = false) => {
   try {
     if (!stockSymbol || !stockSymbol.match(/^[A-Za-z]+$/)) {
       throw new Error("Invalid symbol format. Use letters only.");
     }
 
-    const cachedData = getCachedPrice(stockSymbol);
-    if (cachedData) {
-      console.log(`Using cached price for ${stockSymbol}`);
-      return cachedData;
+    // Only use cache if not forcing refresh and rate limit allows
+    if (!forceRefresh) {
+      const cachedData = getCachedPrice(stockSymbol);
+      if (cachedData && checkRateLimit()) {
+        console.log(`Using cached price for ${stockSymbol}`);
+        return cachedData;
+      }
     }
 
     if (!checkRateLimit()) {
@@ -90,16 +89,19 @@ export const fetchStockPrice = async (stockSymbol) => {
   }
 };
 
-export const fetchStockPrices = async (symbols) => {
+export const fetchStockPrices = async (symbols, forceRefresh = false) => {
   const uniqueSymbols = [...new Set(symbols)];
   const priceMap = {};
 
-  uniqueSymbols.forEach((symbol) => {
-    const cached = getCachedPrice(symbol);
-    if (cached) {
-      priceMap[symbol] = cached;
-    }
-  });
+  // If not forcing refresh, check cache first
+  if (!forceRefresh) {
+    uniqueSymbols.forEach((symbol) => {
+      const cached = getCachedPrice(symbol);
+      if (cached) {
+        priceMap[symbol] = cached;
+      }
+    });
+  }
 
   const uncachedSymbols = uniqueSymbols.filter((symbol) => !priceMap[symbol]);
   const batchSize = 10;
@@ -109,7 +111,7 @@ export const fetchStockPrices = async (symbols) => {
     await Promise.all(
       batch.map(async (symbol) => {
         try {
-          const price = await fetchStockPrice(symbol);
+          const price = await fetchStockPrice(symbol, forceRefresh);
           if (price) {
             priceMap[symbol] = price;
           }
