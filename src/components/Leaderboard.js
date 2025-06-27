@@ -46,6 +46,7 @@ import {
   FaChevronLeft,
   FaChevronRight,
 } from "react-icons/fa";
+import { MAJOR_COLORS } from "../constants/majors";
 
 const MotionTr = motion(Tr);
 
@@ -131,26 +132,7 @@ function Leaderboard() {
   };
 
   const majorColor = (major) => {
-    switch ((major || "").toLowerCase()) {
-      case "computer science":
-        return "blue";
-      case "engineering":
-        return "orange";
-      case "mathematics":
-        return "purple";
-      case "physics":
-        return "teal";
-      case "chemistry":
-        return "green";
-      case "biology":
-        return "lime";
-      case "economics":
-        return "yellow";
-      case "business":
-        return "pink";
-      default:
-        return "gray";
-    }
+    return MAJOR_COLORS[major] || "gray";
   };
 
   const handleRowClick = (user) => {
