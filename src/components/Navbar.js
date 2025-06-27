@@ -59,6 +59,7 @@ import {
   FaLinkedin,
   FaTrash,
   FaKey,
+  FaUniversity,
 } from "react-icons/fa";
 import {
   collection,
@@ -80,6 +81,7 @@ import {
   reauthenticateWithCredential,
   EmailAuthProvider,
 } from "firebase/auth";
+import { MAJORS, STUDY_YEARS } from "../constants/majors";
 
 function Navbar() {
   const { currentUser, logout } = useAuth();
@@ -369,15 +371,18 @@ function Navbar() {
         <Container maxW="7xl">
           <Flex py={4} align="center">
             <Link to="/dashboard">
-              <Heading
-                size="lg"
-                bgGradient="linear(to-r, blue.400, blue.600)"
-                bgClip="text"
-                fontWeight="extrabold"
-                letterSpacing="tight"
-              >
-                UofT Stocker
-              </Heading>
+              <HStack spacing={4}>
+                <Icon as={FaUniversity} color="blue.600" boxSize={8} />
+                <Heading
+                  size="lg"
+                  bgGradient="linear(to-r, blue.400, blue.600)"
+                  bgClip="text"
+                  fontWeight="extrabold"
+                  letterSpacing="tight"
+                >
+                  UofT Stocker
+                </Heading>
+              </HStack>
             </Link>
 
             {currentUser && (
@@ -703,52 +708,11 @@ function Navbar() {
                             }}
                           >
                             <option value="">Select Major</option>
-                            <option value="Computer Science">
-                              Computer Science
-                            </option>
-                            <option value="Electrical Engineering">
-                              Electrical Engineering
-                            </option>
-                            <option value="Mechanical Engineering">
-                              Mechanical Engineering
-                            </option>
-                            <option value="Civil Engineering">
-                              Civil Engineering
-                            </option>
-                            <option value="Chemical Engineering">
-                              Chemical Engineering
-                            </option>
-                            <option value="Biomedical Engineering">
-                              Biomedical Engineering
-                            </option>
-                            <option value="Aerospace Engineering">
-                              Aerospace Engineering
-                            </option>
-                            <option value="Industrial Engineering">
-                              Industrial Engineering
-                            </option>
-                            <option value="Environmental Engineering">
-                              Environmental Engineering
-                            </option>
-                            <option value="Materials Science">
-                              Materials Science
-                            </option>
-                            <option value="Biology">Biology</option>
-                            <option value="Chemistry">Chemistry</option>
-                            <option value="Physics">Physics</option>
-                            <option value="Mathematics">Mathematics</option>
-                            <option value="Statistics">Statistics</option>
-                            <option value="Economics">Economics</option>
-                            <option value="Psychology">Psychology</option>
-                            <option value="Sociology">Sociology</option>
-                            <option value="Political Science">
-                              Political Science
-                            </option>
-                            <option value="Business">Business</option>
-                            <option value="Finance">Finance</option>
-                            <option value="Marketing">Marketing</option>
-                            <option value="Accounting">Accounting</option>
-                            <option value="Other">Other</option>
+                            {MAJORS.map((major) => (
+                              <option key={major} value={major}>
+                                {major}
+                              </option>
+                            ))}
                           </Select>
                         ) : (
                           <Text
@@ -783,11 +747,11 @@ function Navbar() {
                             }}
                           >
                             <option value="">Select Year</option>
-                            <option value="1st Year">1st Year</option>
-                            <option value="2nd Year">2nd Year</option>
-                            <option value="3rd Year">3rd Year</option>
-                            <option value="4th Year">4th Year</option>
-                            <option value="Graduate">Graduate</option>
+                            {STUDY_YEARS.map((year) => (
+                              <option key={year} value={year}>
+                                {year}
+                              </option>
+                            ))}
                           </Select>
                         ) : (
                           <Text
