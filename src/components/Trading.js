@@ -410,7 +410,6 @@ function Trading() {
     };
   }, [stockData?.symbol]);
 
-  // Render
   return (
     <Box minH="100vh" bg={pageBgColor} py={8}>
       <Container maxW="1400px">

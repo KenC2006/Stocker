@@ -238,7 +238,6 @@ function Navbar() {
       await batch.commit();
       await deleteUser(currentUser);
 
-      // Close all modals
       setIsReauthModalOpen(false);
       onAccountClose();
       onDeleteClose();
@@ -251,7 +250,6 @@ function Navbar() {
         isClosable: true,
       });
 
-      // Navigate to login page
       navigate("/login");
     } catch (error) {
       if (error.code === "auth/wrong-password") {
