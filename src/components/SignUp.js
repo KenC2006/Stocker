@@ -50,8 +50,17 @@ function SignUp() {
   const navigate = useNavigate();
   const toast = useToast();
 
-  const bgColor = useColorModeValue("white", "gray.800");
   const accentColor = useColorModeValue("blue.500", "blue.300");
+
+  const textColor = useColorModeValue("gray.800", "white");
+  const subtitleColor = useColorModeValue("gray.600", "gray.300");
+  const labelColor = useColorModeValue("gray.700", "gray.200");
+  const inputBg = useColorModeValue("gray.50", "gray.700");
+  const inputColor = useColorModeValue("gray.800", "white");
+  const inputFocusBg = useColorModeValue("white", "gray.600");
+  const placeholderColor = useColorModeValue("gray.500", "gray.400");
+  const iconColor = useColorModeValue("gray.500", "gray.300");
+  const errorColor = useColorModeValue("red.500", "red.300");
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -129,7 +138,7 @@ function SignUp() {
         <Flex
           direction={{ base: "column", lg: "row" }}
           minH="90vh"
-          bg={bgColor}
+          bg={useColorModeValue("white", "gray.800")}
           borderRadius="2xl"
           overflow="hidden"
           boxShadow="2xl"
@@ -158,26 +167,34 @@ function SignUp() {
                 <Heading
                   size="2xl"
                   fontWeight="extrabold"
-                  color="blue.600"
+                  color={useColorModeValue("blue.600", "blue.300")}
                   lineHeight="1.2"
                 >
                   Start Your Trading Journey
                 </Heading>
-                <Text fontSize="lg" color="gray.600" mt={4}>
+                <Text fontSize="lg" color={subtitleColor} mt={4}>
                   Showcase your market dominance against others
                 </Text>
               </Box>
 
               <VStack spacing={6} align="start" w="full">
                 <HStack spacing={4}>
-                  <Box p={3} bg="green.100" borderRadius="lg" color="green.700">
+                  <Box
+                    p={3}
+                    bg={useColorModeValue("green.100", "green.900")}
+                    borderRadius="lg"
+                    color={useColorModeValue("green.700", "green.300")}
+                  >
                     <Icon as={FaUserGraduate} boxSize={5} />
                   </Box>
                   <Box>
-                    <Text fontWeight="semibold" color="green.700">
+                    <Text
+                      fontWeight="semibold"
+                      color={useColorModeValue("green.700", "green.300")}
+                    >
                       Student Community
                     </Text>
-                    <Text fontSize="sm" color="gray.600">
+                    <Text fontSize="sm" color={subtitleColor}>
                       Connect with fellow UofT students on the leaderboard
                     </Text>
                   </Box>
@@ -186,17 +203,20 @@ function SignUp() {
                 <HStack spacing={4}>
                   <Box
                     p={3}
-                    bg="purple.100"
+                    bg={useColorModeValue("purple.100", "purple.900")}
                     borderRadius="lg"
-                    color="purple.700"
+                    color={useColorModeValue("purple.700", "purple.300")}
                   >
                     <Icon as={FaShieldAlt} boxSize={5} />
                   </Box>
                   <Box>
-                    <Text fontWeight="semibold" color="purple.700">
+                    <Text
+                      fontWeight="semibold"
+                      color={useColorModeValue("purple.700", "purple.300")}
+                    >
                       Risk-Free Learning
                     </Text>
-                    <Text fontSize="sm" color="gray.600">
+                    <Text fontSize="sm" color={subtitleColor}>
                       Practice trading with virtual money and no risk
                     </Text>
                   </Box>
@@ -205,17 +225,20 @@ function SignUp() {
                 <HStack spacing={4}>
                   <Box
                     p={3}
-                    bg="orange.100"
+                    bg={useColorModeValue("orange.100", "orange.900")}
                     borderRadius="lg"
-                    color="orange.700"
+                    color={useColorModeValue("orange.700", "orange.300")}
                   >
                     <Icon as={FaTrophy} boxSize={5} />
                   </Box>
                   <Box>
-                    <Text fontWeight="semibold" color="orange.700">
+                    <Text
+                      fontWeight="semibold"
+                      color={useColorModeValue("orange.700", "orange.300")}
+                    >
                       Win Prizes
                     </Text>
-                    <Text fontSize="sm" color="gray.600">
+                    <Text fontSize="sm" color={subtitleColor}>
                       Participate in monthly competitions and win prizes
                     </Text>
                   </Box>
@@ -227,10 +250,10 @@ function SignUp() {
           <Box flex="1" p={12} display="flex" alignItems="center">
             <VStack spacing={8} w="full" maxW="md" mx="auto">
               <Box textAlign="center" w="full">
-                <Heading size="xl" fontWeight="bold" color="gray.800" mb={2}>
+                <Heading size="xl" fontWeight="bold" color={textColor} mb={2}>
                   Create Account
                 </Heading>
-                <Text color="gray.600" mb={4}>
+                <Text color={subtitleColor} mb={4}>
                   Join and compete against hundreds of students
                 </Text>
               </Box>
@@ -239,7 +262,7 @@ function SignUp() {
                 <VStack spacing={6}>
                   <SimpleGrid columns={{ base: 1, md: 2 }} spacing={4} w="100%">
                     <FormControl isRequired>
-                      <FormLabel fontWeight="semibold" color="gray.700">
+                      <FormLabel fontWeight="semibold" color={labelColor}>
                         First Name
                       </FormLabel>
                       <Input
@@ -248,14 +271,23 @@ function SignUp() {
                         size="lg"
                         borderRadius="lg"
                         borderWidth="2px"
+                        bg={inputBg}
+                        color={inputColor}
                         _focus={{
                           borderColor: accentColor,
                           boxShadow: "0 0 0 1px " + accentColor,
+                          bg: inputFocusBg,
+                        }}
+                        _hover={{
+                          bg: inputFocusBg,
+                        }}
+                        _placeholder={{
+                          color: placeholderColor,
                         }}
                       />
                     </FormControl>
                     <FormControl isRequired>
-                      <FormLabel fontWeight="semibold" color="gray.700">
+                      <FormLabel fontWeight="semibold" color={labelColor}>
                         Last Name
                       </FormLabel>
                       <Input
@@ -264,9 +296,18 @@ function SignUp() {
                         size="lg"
                         borderRadius="lg"
                         borderWidth="2px"
+                        bg={inputBg}
+                        color={inputColor}
                         _focus={{
                           borderColor: accentColor,
                           boxShadow: "0 0 0 1px " + accentColor,
+                          bg: inputFocusBg,
+                        }}
+                        _hover={{
+                          bg: inputFocusBg,
+                        }}
+                        _placeholder={{
+                          color: placeholderColor,
                         }}
                       />
                     </FormControl>
@@ -276,7 +317,7 @@ function SignUp() {
                     isRequired
                     isInvalid={email && !email.endsWith("@mail.utoronto.ca")}
                   >
-                    <FormLabel fontWeight="semibold" color="gray.700">
+                    <FormLabel fontWeight="semibold" color={labelColor}>
                       UofT Email Address
                     </FormLabel>
                     <Input
@@ -287,13 +328,22 @@ function SignUp() {
                       borderRadius="lg"
                       borderWidth="2px"
                       placeholder="your.email@mail.utoronto.ca"
+                      bg={inputBg}
+                      color={inputColor}
                       _focus={{
                         borderColor: accentColor,
                         boxShadow: "0 0 0 1px " + accentColor,
+                        bg: inputFocusBg,
+                      }}
+                      _hover={{
+                        bg: inputFocusBg,
+                      }}
+                      _placeholder={{
+                        color: placeholderColor,
                       }}
                     />
                     {email && !email.endsWith("@mail.utoronto.ca") && (
-                      <Text fontSize="sm" color="red.500" mt={1}>
+                      <Text fontSize="sm" color={errorColor} mt={1}>
                         Please use your UofT email address (@mail.utoronto.ca)
                       </Text>
                     )}
@@ -301,7 +351,7 @@ function SignUp() {
 
                   <SimpleGrid columns={{ base: 1, md: 2 }} spacing={4} w="100%">
                     <FormControl isRequired>
-                      <FormLabel fontWeight="semibold" color="gray.700">
+                      <FormLabel fontWeight="semibold" color={labelColor}>
                         Major
                       </FormLabel>
                       <Select
@@ -310,9 +360,15 @@ function SignUp() {
                         size="lg"
                         borderRadius="lg"
                         borderWidth="2px"
+                        bg={inputBg}
+                        color={inputColor}
                         _focus={{
                           borderColor: accentColor,
                           boxShadow: "0 0 0 1px " + accentColor,
+                          bg: inputFocusBg,
+                        }}
+                        _hover={{
+                          bg: inputFocusBg,
                         }}
                       >
                         <option value="">Select Major</option>
@@ -324,7 +380,7 @@ function SignUp() {
                       </Select>
                     </FormControl>
                     <FormControl isRequired>
-                      <FormLabel fontWeight="semibold" color="gray.700">
+                      <FormLabel fontWeight="semibold" color={labelColor}>
                         Study Year
                       </FormLabel>
                       <Select
@@ -333,9 +389,15 @@ function SignUp() {
                         size="lg"
                         borderRadius="lg"
                         borderWidth="2px"
+                        bg={inputBg}
+                        color={inputColor}
                         _focus={{
                           borderColor: accentColor,
                           boxShadow: "0 0 0 1px " + accentColor,
+                          bg: inputFocusBg,
+                        }}
+                        _hover={{
+                          bg: inputFocusBg,
                         }}
                       >
                         <option value="">Select Year</option>
@@ -349,7 +411,7 @@ function SignUp() {
                   </SimpleGrid>
 
                   <FormControl isRequired>
-                    <FormLabel fontWeight="semibold" color="gray.700">
+                    <FormLabel fontWeight="semibold" color={labelColor}>
                       Password
                     </FormLabel>
                     <InputGroup size="lg">
@@ -359,9 +421,18 @@ function SignUp() {
                         onChange={(e) => setPassword(e.target.value)}
                         borderRadius="lg"
                         borderWidth="2px"
+                        bg={inputBg}
+                        color={inputColor}
                         _focus={{
                           borderColor: accentColor,
                           boxShadow: "0 0 0 1px " + accentColor,
+                          bg: inputFocusBg,
+                        }}
+                        _hover={{
+                          bg: inputFocusBg,
+                        }}
+                        _placeholder={{
+                          color: placeholderColor,
                         }}
                       />
                       <InputRightElement width="3rem">
@@ -370,7 +441,7 @@ function SignUp() {
                           size="sm"
                           onClick={() => setShowPassword(!showPassword)}
                           variant="ghost"
-                          color="gray.500"
+                          color={iconColor}
                         >
                           <Icon as={showPassword ? FaEyeSlash : FaEye} />
                         </Button>
@@ -379,7 +450,7 @@ function SignUp() {
                   </FormControl>
 
                   <FormControl isRequired>
-                    <FormLabel fontWeight="semibold" color="gray.700">
+                    <FormLabel fontWeight="semibold" color={labelColor}>
                       Confirm Password
                     </FormLabel>
                     <InputGroup size="lg">
@@ -389,9 +460,18 @@ function SignUp() {
                         onChange={(e) => setConfirmPassword(e.target.value)}
                         borderRadius="lg"
                         borderWidth="2px"
+                        bg={inputBg}
+                        color={inputColor}
                         _focus={{
                           borderColor: accentColor,
                           boxShadow: "0 0 0 1px " + accentColor,
+                          bg: inputFocusBg,
+                        }}
+                        _hover={{
+                          bg: inputFocusBg,
+                        }}
+                        _placeholder={{
+                          color: placeholderColor,
                         }}
                       />
                       <InputRightElement width="3rem">
@@ -402,7 +482,7 @@ function SignUp() {
                             setShowConfirmPassword(!showConfirmPassword)
                           }
                           variant="ghost"
-                          color="gray.500"
+                          color={iconColor}
                         >
                           <Icon as={showConfirmPassword ? FaEyeSlash : FaEye} />
                         </Button>
@@ -434,7 +514,7 @@ function SignUp() {
               <Divider />
 
               <HStack spacing={1} justify="center">
-                <Text color="gray.600">Already have an account?</Text>
+                <Text color={subtitleColor}>Already have an account?</Text>
                 <ChakraLink
                   as={Link}
                   to="/login"
