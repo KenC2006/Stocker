@@ -174,7 +174,7 @@ function Navbar() {
       }
     };
     fetchUserInfo();
-  }, [currentUser]);
+  }, [currentUser, toast]);
 
   const handleLogout = async () => {
     try {

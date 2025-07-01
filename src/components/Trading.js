@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   Box,
   Container,
@@ -53,7 +53,6 @@ function Trading() {
   const [loading, setLoading] = useState(false);
   const [quantity, setQuantity] = useState(1);
   const [portfolio, setPortfolio] = useState([]);
-  const [loadingPortfolio, setLoadingPortfolio] = useState(true);
   const [userData, setUserData] = useState(null);
   const [sellQuantities, setSellQuantities] = useState({});
 
@@ -96,10 +95,9 @@ function Trading() {
 
   const marketOpen = isMarketOpen();
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     if (!currentUser) return;
 
-    setLoadingPortfolio(true);
     try {
       const [userDoc, stocksSnapshot] = await Promise.all([
         getDoc(doc(db, "users", currentUser.uid)),
@@ -158,10 +156,8 @@ function Trading() {
         duration: 5000,
         isClosable: true,
       });
-    } finally {
-      setLoadingPortfolio(false);
     }
-  };
+  }, [currentUser, toast]);
 
   const searchStock = async () => {
     if (!symbol) {
@@ -374,13 +370,13 @@ function Trading() {
     if (currentUser) {
       fetchData();
     }
-  }, [currentUser, location.pathname]);
+  }, [currentUser, location.pathname, fetchData]);
 
   useEffect(() => {
     if (!portfolio.length) return;
     const interval = setInterval(fetchData, 30000);
     return () => clearInterval(interval);
-  }, [portfolio.length]);
+  }, [portfolio.length, fetchData]);
 
   useEffect(() => {
     if (!stockData?.symbol) return;
