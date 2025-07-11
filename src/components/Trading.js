@@ -55,6 +55,7 @@ function Trading() {
   const [portfolio, setPortfolio] = useState([]);
   const [userData, setUserData] = useState(null);
   const [sellQuantities, setSellQuantities] = useState({});
+  const [isTrading, setIsTrading] = useState(false);
 
   const { currentUser } = useAuth();
   const toast = useToast();
@@ -204,10 +205,10 @@ function Trading() {
       return;
     }
 
-    if (!stockData || !quantity) return;
+    if (!stockData || !quantity || isTrading) return;
 
+    setIsTrading(true);
     try {
-      const batch = writeBatch(db);
       const cost = stockData.price * quantity;
 
       if (type === "buy") {
@@ -215,8 +216,9 @@ function Trading() {
           throw new Error("Insufficient funds");
         }
 
+        const batch = writeBatch(db);
         const userRef = doc(db, "users", currentUser.uid);
-        batch.update(userRef, { balance: userData.balance - cost });
+        batch.update(userRef, { balance: increment(-cost) });
 
         const existingStockQuery = query(
           collection(db, "stocks"),
@@ -287,6 +289,8 @@ function Trading() {
         isClosable: true,
       });
       console.error("Trade error:", error);
+    } finally {
+      setIsTrading(false);
     }
   };
 
@@ -303,6 +307,9 @@ function Trading() {
       return;
     }
 
+    if (isTrading) return;
+
+    setIsTrading(true);
     try {
       const priceData = await fetchStockPrice(stock.symbol);
       const proceeds = priceData.price * sellQuantity;
@@ -357,6 +364,8 @@ function Trading() {
         isClosable: true,
       });
       console.error("Sell error:", error);
+    } finally {
+      setIsTrading(false);
     }
   };
 
@@ -656,16 +665,20 @@ function Trading() {
                         <Button
                           colorScheme="blue"
                           onClick={() => handleTrade("buy")}
-                          isDisabled={!stockData || !isMarketOpen()}
+                          isDisabled={
+                            !stockData || !isMarketOpen() || isTrading
+                          }
                           flex="1"
                         >
-                          Buy
+                          {isTrading ? "Buying..." : "Buy"}
                         </Button>
                         <Button
                           colorScheme="blue"
                           variant="outline"
                           onClick={handleMaxBuy}
-                          isDisabled={!stockData || !isMarketOpen()}
+                          isDisabled={
+                            !stockData || !isMarketOpen() || isTrading
+                          }
                           flex="1"
                         >
                           Max Buy
@@ -781,9 +794,9 @@ function Trading() {
                                     sellQuantities[stock.id] || 1
                                   )
                                 }
-                                isDisabled={!isMarketOpen()}
+                                isDisabled={!isMarketOpen() || isTrading}
                               >
-                                Sell
+                                {isTrading ? "Selling..." : "Sell"}
                               </Button>
                             </HStack>
                           </Td>
