@@ -16,8 +16,21 @@ import Navbar from "./components/Navbar";
 import theme from "./theme";
 
 const PrivateRoute = ({ children }) => {
-  const { currentUser } = useAuth();
+  const { currentUser, guestMode } = useAuth();
+  if (guestMode) return <Navigate to="/leaderboard" />;
   return currentUser ? children : <Navigate to="/login" />;
+};
+
+const GuestRoute = ({ children }) => {
+  const { currentUser, guestMode } = useAuth();
+  return currentUser || guestMode ? children : <Navigate to="/login" />;
+};
+
+const RootRoute = () => {
+  const { currentUser, guestMode } = useAuth();
+  if (guestMode) return <Navigate to="/leaderboard" />;
+  if (currentUser) return <Navigate to="/dashboard" />;
+  return <Navigate to="/login" />;
 };
 
 function App() {
@@ -42,20 +55,20 @@ function App() {
               <Route
                 path="/leaderboard"
                 element={
-                  <PrivateRoute>
+                  <GuestRoute>
                     <Leaderboard />
-                  </PrivateRoute>
+                  </GuestRoute>
                 }
               />
               <Route
                 path="/trading"
                 element={
-                  <PrivateRoute>
+                  <GuestRoute>
                     <Trading />
-                  </PrivateRoute>
+                  </GuestRoute>
                 }
               />
-              <Route path="/" element={<Navigate to="/dashboard" />} />
+              <Route path="/" element={<RootRoute />} />
             </Routes>
           </Box>
         </AuthProvider>

@@ -1,6 +1,5 @@
 import axios from "axios";
 
-// Global cache and rate limiting
 const priceCache = new Map();
 let apiCallsCount = 0;
 let lastResetTime = Date.now();
@@ -16,7 +15,6 @@ const checkRateLimit = () => {
   }
 
   if (apiCallsCount >= API_CALL_LIMIT) {
-    console.warn("Rate limit reached, using cached data");
     return false;
   }
 
@@ -25,7 +23,10 @@ const checkRateLimit = () => {
 
 const getCachedPrice = (stockSymbol) => {
   const cached = priceCache.get(stockSymbol);
-  return cached ? cached.data : null;
+  if (cached && Date.now() - cached.timestamp < 60000) {
+    return cached.data;
+  }
+  return null;
 };
 
 export const fetchStockPrice = async (stockSymbol, forceRefresh = false) => {
@@ -34,11 +35,9 @@ export const fetchStockPrice = async (stockSymbol, forceRefresh = false) => {
       throw new Error("Invalid symbol format. Use letters only.");
     }
 
-    // Only use cache if not forcing refresh and rate limit allows
     if (!forceRefresh) {
       const cachedData = getCachedPrice(stockSymbol);
       if (cachedData && checkRateLimit()) {
-        console.log(`Using cached price for ${stockSymbol}`);
         return cachedData;
       }
     }
@@ -46,7 +45,6 @@ export const fetchStockPrice = async (stockSymbol, forceRefresh = false) => {
     if (!checkRateLimit()) {
       const cached = getCachedPrice(stockSymbol);
       if (cached) {
-        console.log(`Using cached price for ${stockSymbol} due to rate limit`);
         return cached;
       }
       throw new Error("Rate limit reached. Please try again later.");
@@ -84,7 +82,6 @@ export const fetchStockPrice = async (stockSymbol, forceRefresh = false) => {
 
     return stockData;
   } catch (error) {
-    console.error("Finnhub API error:", error.message);
     throw error;
   }
 };
@@ -93,7 +90,6 @@ export const fetchStockPrices = async (symbols, forceRefresh = false) => {
   const uniqueSymbols = [...new Set(symbols)];
   const priceMap = {};
 
-  // If not forcing refresh, check cache first
   if (!forceRefresh) {
     uniqueSymbols.forEach((symbol) => {
       const cached = getCachedPrice(symbol);
@@ -115,9 +111,7 @@ export const fetchStockPrices = async (symbols, forceRefresh = false) => {
           if (price) {
             priceMap[symbol] = price;
           }
-        } catch (error) {
-          console.error(`Error fetching price for ${symbol}:`, error);
-        }
+        } catch (error) {}
       })
     );
   }
