@@ -15,11 +15,9 @@ function sleep(ms) {
 }
 
 exports.updateLeaderboardDaily = functions.pubsub
-  .schedule("0 2 * * *") // 2am UTC
+  .schedule("0 2 * * *")
   .timeZone("America/Toronto")
   .onRun(async (context) => {
-    console.log("Starting leaderboard update...");
-
     const usersSnapshot = await db.collection("users").get();
     const users = usersSnapshot.docs.map((doc) => ({
       id: doc.id,
@@ -30,7 +28,6 @@ exports.updateLeaderboardDaily = functions.pubsub
     let minuteStart = Date.now();
 
     for (const user of users) {
-      // Get all stocks for this user
       const stocksSnapshot = await db
         .collection("stocks")
         .where("userId", "==", user.id)
@@ -40,19 +37,16 @@ exports.updateLeaderboardDaily = functions.pubsub
       let portfolioValue = 0;
       let initialValue = 0;
       for (const stock of stocks) {
-        // Rate limit logic
         if (apiCalls >= API_LIMIT_PER_MIN) {
           const elapsed = Date.now() - minuteStart;
           if (elapsed < 60000) {
             const wait = 60000 - elapsed;
-            console.log(`API limit reached, waiting ${wait}ms...`);
             await sleep(wait);
           }
           apiCalls = 0;
           minuteStart = Date.now();
         }
 
-        // Fetch latest price
         try {
           const response = await axios.get(FINNHUB_URL, {
             params: {
@@ -67,47 +61,24 @@ exports.updateLeaderboardDaily = functions.pubsub
             portfolioValue += price * stock.quantity;
             initialValue += stock.purchasePrice * stock.quantity;
           }
-        } catch (err) {
-          console.error(
-            `Error fetching price for ${stock.symbol}:`,
-            err.message
-          );
-        }
+        } catch (err) {}
       }
 
-      // Add cash balance
       const cash = user.balance || 0;
       const totalValue = portfolioValue + cash;
       const initialInvestment = 30000;
       const gainLoss = totalValue - initialInvestment;
-      const gainLossPercent = (gainLoss / initialInvestment) * 100;
+      const gainLossPercent =
+        initialInvestment > 0 ? (gainLoss / initialInvestment) * 100 : 0;
 
-      // Update user document with new values
       try {
         await db.collection("users").doc(user.id).update({
           portfolioValue,
           totalValue,
           gainLoss,
           gainLossPercent,
-          initialInvestment,
           lastLeaderboardUpdate: admin.firestore.FieldValue.serverTimestamp(),
         });
-        console.log(
-          `Updated user ${
-            user.id
-          } with portfolioValue $${portfolioValue.toFixed(
-            2
-          )}, totalValue $${totalValue.toFixed(
-            2
-          )}, gain/loss $${gainLoss.toFixed(2)} (${gainLossPercent.toFixed(
-            2
-          )}%)`
-        );
-      } catch (err) {
-        console.error(`Error updating user ${user.id}:`, err.message);
-      }
+      } catch (err) {}
     }
-
-    console.log("Leaderboard update complete.");
-    return null;
   });

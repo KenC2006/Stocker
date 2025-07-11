@@ -84,7 +84,7 @@ import {
 import { MAJORS, STUDY_YEARS } from "../constants/majors";
 
 function Navbar() {
-  const { currentUser, logout } = useAuth();
+  const { currentUser, guestMode, logout, exitGuestMode } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const { colorMode, toggleColorMode } = useColorMode();
@@ -163,7 +163,6 @@ function Navbar() {
           });
         }
       } catch (error) {
-        console.error("Error fetching user info:", error);
         toast({
           title: "Error",
           description: "Failed to load profile information.",
@@ -180,9 +179,7 @@ function Navbar() {
     try {
       await logout();
       navigate("/login");
-    } catch (error) {
-      console.error("Failed to log out:", error);
-    }
+    } catch (error) {}
   };
 
   const handleDeleteAccount = () => {
@@ -277,7 +274,6 @@ function Navbar() {
           isClosable: true,
         });
       }
-      console.error("Error during re-auth/delete:", error);
     } finally {
       setIsReauthenticating(false);
       setReauthPassword("");
@@ -297,7 +293,6 @@ function Navbar() {
         isClosable: true,
       });
     } catch (error) {
-      console.error("Error sending password reset email:", error);
       toast({
         title: "Error",
         description: error.message,
@@ -337,7 +332,6 @@ function Navbar() {
       });
       setIsEditing(false);
     } catch (error) {
-      console.error("Error updating profile:", error);
       toast({
         title: "Error",
         description: "Failed to update profile. Please try again.",
@@ -383,29 +377,33 @@ function Navbar() {
               </HStack>
             </Link>
 
-            {currentUser && (
+            {(currentUser || guestMode) && (
               <HStack spacing={1} ml="auto">
-                <Button
-                  as={Link}
-                  to="/dashboard"
-                  leftIcon={<FaChartLine />}
-                  borderRadius="full"
-                  px={6}
-                  py={2}
-                  fontSize="md"
-                  fontWeight={isActive("/dashboard") ? "bold" : "normal"}
-                  bgGradient={isActive("/dashboard") ? navButtonBg : undefined}
-                  color={isActive("/dashboard") ? "white" : navTextColor}
-                  _hover={{
-                    bg: navButtonHover,
-                    color: "white",
-                    boxShadow: "md",
-                  }}
-                  transition="all 0.2s"
-                  variant={isActive("/dashboard") ? "solid" : "ghost"}
-                >
-                  Dashboard
-                </Button>
+                {!guestMode && (
+                  <Button
+                    as={Link}
+                    to="/dashboard"
+                    leftIcon={<FaChartLine />}
+                    borderRadius="full"
+                    px={6}
+                    py={2}
+                    fontSize="md"
+                    fontWeight={isActive("/dashboard") ? "bold" : "normal"}
+                    bgGradient={
+                      isActive("/dashboard") ? navButtonBg : undefined
+                    }
+                    color={isActive("/dashboard") ? "white" : navTextColor}
+                    _hover={{
+                      bg: navButtonHover,
+                      color: "white",
+                      boxShadow: "md",
+                    }}
+                    transition="all 0.2s"
+                    variant={isActive("/dashboard") ? "solid" : "ghost"}
+                  >
+                    Dashboard
+                  </Button>
+                )}
                 <Button
                   as={Link}
                   to="/trading"
@@ -470,59 +468,115 @@ function Navbar() {
                     <Avatar
                       size="sm"
                       name={
-                        currentUser?.displayName ||
-                        currentUser?.email?.charAt(0)?.toUpperCase() ||
-                        "U"
+                        guestMode
+                          ? "G"
+                          : currentUser?.displayName ||
+                            currentUser?.email?.charAt(0)?.toUpperCase() ||
+                            "U"
                       }
-                      bg="blue.400"
+                      bg={guestMode ? "orange.400" : "blue.400"}
                       color="white"
                     />
                   </MenuButton>
                   <MenuList>
-                    <MenuGroup title="Profile">
-                      <MenuItem
-                        icon={<Icon as={FaUser} />}
-                        onClick={onAccountOpen}
-                        color={menuItemTextColor}
-                      >
-                        My Account
-                      </MenuItem>
-                    </MenuGroup>
-                    <MenuDivider />
-                    <MenuGroup title="Settings">
-                      <MenuItem closeOnSelect={false} color={menuItemTextColor}>
-                        <Flex
-                          justify="space-between"
-                          align="center"
-                          width="100%"
+                    {guestMode ? (
+                      <>
+                        <MenuGroup title="Guest Mode">
+                          <MenuItem
+                            icon={<Icon as={FaUser} />}
+                            color={menuItemTextColor}
+                            isDisabled
+                          >
+                            Guest User
+                          </MenuItem>
+                        </MenuGroup>
+                        <MenuDivider />
+                        <MenuGroup title="Settings">
+                          <MenuItem
+                            closeOnSelect={false}
+                            color={menuItemTextColor}
+                          >
+                            <Flex
+                              justify="space-between"
+                              align="center"
+                              width="100%"
+                            >
+                              <HStack>
+                                <Icon
+                                  as={colorMode === "light" ? FaMoon : FaSun}
+                                />
+                                <Text>Dark Mode</Text>
+                              </HStack>
+                              <Switch
+                                isChecked={colorMode === "dark"}
+                                onChange={toggleColorMode}
+                                colorScheme="blue"
+                              />
+                            </Flex>
+                          </MenuItem>
+                        </MenuGroup>
+                        <MenuDivider />
+                        <MenuItem
+                          icon={<Icon as={FaSignOutAlt} />}
+                          onClick={exitGuestMode}
+                          color="orange.500"
                         >
-                          <HStack>
-                            <Icon as={colorMode === "light" ? FaMoon : FaSun} />
-                            <Text>Dark Mode</Text>
-                          </HStack>
-                          <Switch
-                            isChecked={colorMode === "dark"}
-                            onChange={toggleColorMode}
-                            colorScheme="blue"
-                          />
-                        </Flex>
-                      </MenuItem>
-                      <MenuItem
-                        icon={<Icon as={FaQuestionCircle} />}
-                        onClick={onHelpOpen}
-                        color={menuItemTextColor}
-                      >
-                        Help & Support
-                      </MenuItem>
-                    </MenuGroup>
-                    <MenuDivider />
-                    <MenuItem
-                      icon={<Icon as={FaSignOutAlt} />}
-                      onClick={handleLogout}
-                      color="red.500"
-                    >
-                      Logout
-                    </MenuItem>
+                          Exit Guest Mode
+                        </MenuItem>
+                      </>
+                    ) : (
+                      <>
+                        <MenuGroup title="Profile">
+                          <MenuItem
+                            icon={<Icon as={FaUser} />}
+                            onClick={onAccountOpen}
+                            color={menuItemTextColor}
+                          >
+                            My Account
+                          </MenuItem>
+                        </MenuGroup>
+                        <MenuDivider />
+                        <MenuGroup title="Settings">
+                          <MenuItem
+                            closeOnSelect={false}
+                            color={menuItemTextColor}
+                          >
+                            <Flex
+                              justify="space-between"
+                              align="center"
+                              width="100%"
+                            >
+                              <HStack>
+                                <Icon
+                                  as={colorMode === "light" ? FaMoon : FaSun}
+                                />
+                                <Text>Dark Mode</Text>
+                              </HStack>
+                              <Switch
+                                isChecked={colorMode === "dark"}
+                                onChange={toggleColorMode}
+                                colorScheme="blue"
+                              />
+                            </Flex>
+                          </MenuItem>
+                          <MenuItem
+                            icon={<Icon as={FaQuestionCircle} />}
+                            onClick={onHelpOpen}
+                            color={menuItemTextColor}
+                          >
+                            Help & Support
+                          </MenuItem>
+                        </MenuGroup>
+                        <MenuDivider />
+                        <MenuItem
+                          icon={<Icon as={FaSignOutAlt} />}
+                          onClick={handleLogout}
+                          color="red.500"
+                        >
+                          Logout
+                        </MenuItem>
+                      </>
+                    )}
                   </MenuList>
                 </Menu>
               </HStack>

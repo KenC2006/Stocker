@@ -198,7 +198,6 @@ function Dashboard() {
 
         return rankData;
       } catch (error) {
-        console.error("Error calculating rank:", error);
         return { rank: 0, totalUsers: 0 };
       }
     };
@@ -248,7 +247,6 @@ function Dashboard() {
           });
         }
       } catch (error) {
-        console.error("Error fetching data:", error);
       } finally {
         setLoading(false);
       }

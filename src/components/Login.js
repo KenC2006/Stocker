@@ -51,7 +51,7 @@ function Login() {
     minutes: 0,
   });
 
-  const { login } = useAuth();
+  const { login, enterGuestMode } = useAuth();
   const navigate = useNavigate();
   const toast = useToast();
 
@@ -131,6 +131,11 @@ function Login() {
     }
   };
 
+  const handleGuestMode = () => {
+    enterGuestMode();
+    navigate("/leaderboard");
+  };
+
   const handleForgotPassword = async () => {
     if (!email) {
       toast({
@@ -154,8 +159,6 @@ function Login() {
         isClosable: true,
       });
     } catch (error) {
-      console.error("Error sending password reset email:", error);
-
       let errorMessage =
         "Failed to send password reset email. Please try again.";
 
@@ -620,6 +623,29 @@ function Login() {
                       transition="all 0.2s"
                     >
                       {loading ? "Connecting..." : "Login"}
+                    </Button>
+
+                    <Button
+                      variant="outline"
+                      size="lg"
+                      width="100%"
+                      onClick={handleGuestMode}
+                      borderRadius="lg"
+                      fontWeight="bold"
+                      fontSize="lg"
+                      py={7}
+                      borderWidth="2px"
+                      borderColor={accentColor}
+                      color={accentColor}
+                      _hover={{
+                        bg: accentColor,
+                        color: "white",
+                        transform: "translateY(-2px)",
+                        boxShadow: "lg",
+                      }}
+                      transition="all 0.2s"
+                    >
+                      Continue as Guest
                     </Button>
                   </VStack>
                 </form>

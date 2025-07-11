@@ -57,7 +57,7 @@ function Trading() {
   const [sellQuantities, setSellQuantities] = useState({});
   const [isTrading, setIsTrading] = useState(false);
 
-  const { currentUser } = useAuth();
+  const { currentUser, guestMode } = useAuth();
   const toast = useToast();
   const location = useLocation();
 
@@ -78,6 +78,8 @@ function Trading() {
     "linear(to-r, blue.400, blue.500)",
     "linear(to-r, blue.500, blue.600)"
   );
+  const guestAlertBg = useColorModeValue("blue.50", "blue.900");
+  const guestAlertBorder = useColorModeValue("blue.200", "blue.700");
 
   const isMarketOpen = () => {
     const now = new Date();
@@ -97,7 +99,18 @@ function Trading() {
   const marketOpen = isMarketOpen();
 
   const fetchData = useCallback(async () => {
-    if (!currentUser) return;
+    if (!currentUser && !guestMode) return;
+
+    if (guestMode) {
+      setUserData({
+        balance: 30000,
+        firstName: "Guest",
+        lastName: "User",
+        email: "guest@example.com",
+      });
+      setPortfolio([]);
+      return;
+    }
 
     try {
       const [userDoc, stocksSnapshot] = await Promise.all([
@@ -149,7 +162,6 @@ function Trading() {
 
       setPortfolio(stocks);
     } catch (error) {
-      console.error("Error fetching data:", error);
       toast({
         title: "Error",
         description: "Failed to fetch portfolio data. Please try again.",
@@ -158,7 +170,7 @@ function Trading() {
         isClosable: true,
       });
     }
-  }, [currentUser, toast]);
+  }, [currentUser, guestMode, toast]);
 
   const searchStock = async () => {
     if (!symbol) {
@@ -193,6 +205,17 @@ function Trading() {
   };
 
   const handleTrade = async (type) => {
+    if (guestMode) {
+      toast({
+        title: "Guest Mode",
+        description: "Please sign up to start trading!",
+        status: "info",
+        duration: 4000,
+        isClosable: true,
+      });
+      return;
+    }
+
     if (!marketOpen) {
       toast({
         title: "Market Closed",
@@ -288,13 +311,23 @@ function Trading() {
         duration: 4000,
         isClosable: true,
       });
-      console.error("Trade error:", error);
     } finally {
       setIsTrading(false);
     }
   };
 
   const handleSell = async (stock, sellQuantity) => {
+    if (guestMode) {
+      toast({
+        title: "Guest Mode",
+        description: "Please sign up to start trading!",
+        status: "info",
+        duration: 4000,
+        isClosable: true,
+      });
+      return;
+    }
+
     if (!marketOpen) {
       toast({
         title: "Market Closed",
@@ -363,7 +396,6 @@ function Trading() {
         duration: 4000,
         isClosable: true,
       });
-      console.error("Sell error:", error);
     } finally {
       setIsTrading(false);
     }
@@ -376,10 +408,10 @@ function Trading() {
   };
 
   useEffect(() => {
-    if (currentUser) {
+    if (currentUser || guestMode) {
       fetchData();
     }
-  }, [currentUser, location.pathname, fetchData]);
+  }, [currentUser, guestMode, location.pathname, fetchData]);
 
   useEffect(() => {
     if (!portfolio.length) return;
@@ -403,9 +435,7 @@ function Trading() {
           changePercent: priceData.changePercent,
           timestamp: priceData.timestamp,
         }));
-      } catch (error) {
-        console.error("Error refreshing selected stock:", error);
-      }
+      } catch (error) {}
     };
 
     const interval = setInterval(refreshSelectedStock, 30000);
@@ -456,6 +486,11 @@ function Trading() {
                   <Text color={subTextColor} fontSize="sm" fontWeight="medium">
                     Available Balance
                   </Text>
+                  {guestMode && (
+                    <Badge colorScheme="orange" size="sm" variant="solid">
+                      Demo
+                    </Badge>
+                  )}
                 </HStack>
                 <Text color={mainTextColor} fontSize="2xl" fontWeight="bold">
                   {userData ? (
@@ -513,6 +548,29 @@ function Trading() {
             </Box>
           </HStack>
         </Flex>
+
+        {guestMode && (
+          <Alert
+            status="info"
+            variant="subtle"
+            borderRadius="lg"
+            mb={6}
+            bg={guestAlertBg}
+            border="1px"
+            borderColor={guestAlertBorder}
+          >
+            <AlertIcon />
+            <VStack align="start" spacing={1}>
+              <Text fontWeight="bold" color={mainTextColor}>
+                🎮 Demo Mode
+              </Text>
+              <Text fontSize="sm" color={subTextColor}>
+                You're exploring the trading interface in demo mode. Sign up to
+                start trading!
+              </Text>
+            </VStack>
+          </Alert>
+        )}
 
         <Flex gap={8} direction={{ base: "column", xl: "row" }}>
           <Box flex={0.8}>

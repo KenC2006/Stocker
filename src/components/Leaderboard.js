@@ -33,6 +33,8 @@ import {
   InputLeftElement,
   Button,
   Flex,
+  Alert,
+  AlertIcon,
 } from "@chakra-ui/react";
 import { motion } from "framer-motion";
 import { db } from "../config/firebase";
@@ -45,8 +47,11 @@ import {
   FaSearch,
   FaChevronLeft,
   FaChevronRight,
+  FaUser,
 } from "react-icons/fa";
 import { MAJOR_COLORS } from "../constants/majors";
+import { useAuth } from "../contexts/AuthContext";
+import { Link as RouterLink } from "react-router-dom";
 
 const MotionTr = motion(Tr);
 
@@ -61,6 +66,7 @@ function Leaderboard() {
   const usersPerPage = 10;
 
   const { isOpen, onOpen, onClose } = useDisclosure();
+  const { guestMode } = useAuth();
 
   const headerBgColor = useColorModeValue("gray.50", "gray.700");
   const borderColor = useColorModeValue("gray.200", "gray.700");
@@ -76,6 +82,8 @@ function Leaderboard() {
   const timerLabelColor = useColorModeValue("uoft.navy", "white");
   const timerSubColor = useColorModeValue("gray.600", "gray.200");
   const rowHoverBg = useColorModeValue("gray.50", "gray.700");
+  const guestAlertBg = useColorModeValue("blue.50", "blue.900");
+  const guestAlertBorder = useColorModeValue("blue.200", "blue.700");
 
   const getNextReset = () => {
     const now = new Date();
@@ -125,9 +133,7 @@ function Leaderboard() {
       leaderboardEntries.sort((a, b) => b.totalValue - a.totalValue);
       setLeaderboardData(leaderboardEntries);
       setFilteredData(leaderboardEntries);
-    } catch (error) {
-      console.error("Error fetching leaderboard data:", error);
-    }
+    } catch (error) {}
     setIsLoading(false);
   };
 
@@ -224,6 +230,65 @@ function Leaderboard() {
               </Text>
             </Box>
           </Box>
+
+          {guestMode && (
+            <Alert
+              status="info"
+              variant="subtle"
+              flexDirection="column"
+              alignItems="center"
+              justifyContent="center"
+              textAlign="center"
+              height="auto"
+              py={6}
+              px={4}
+              borderRadius="xl"
+              bg={guestAlertBg}
+              border="1px"
+              borderColor={guestAlertBorder}
+            >
+              <AlertIcon boxSize="24px" color="blue.500" />
+              <VStack spacing={3} mt={2}>
+                <Text fontWeight="bold" color={mainTextColor}>
+                  👋 Welcome to UofT Stocker!
+                </Text>
+                <Text color={subTextColor} fontSize="sm">
+                  You're currently browsing in guest mode. Sign up to start
+                  trading, build your portfolio, and compete on this
+                  leaderboard!
+                </Text>
+                <HStack spacing={3} mt={2}>
+                  <Button
+                    as={RouterLink}
+                    to="/signup"
+                    colorScheme="blue"
+                    size="sm"
+                    leftIcon={<FaUser />}
+                    _hover={{
+                      transform: "translateY(-1px)",
+                      boxShadow: "md",
+                    }}
+                    transition="all 0.2s"
+                  >
+                    Sign Up to Trade
+                  </Button>
+                  <Button
+                    as={RouterLink}
+                    to="/login"
+                    variant="outline"
+                    size="sm"
+                    _hover={{
+                      transform: "translateY(-1px)",
+                      boxShadow: "md",
+                    }}
+                    transition="all 0.2s"
+                  >
+                    Login
+                  </Button>
+                </HStack>
+              </VStack>
+            </Alert>
+          )}
 
           <Box w="100%" maxW="600px">
             <InputGroup size="lg">
