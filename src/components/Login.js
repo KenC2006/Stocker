@@ -387,7 +387,7 @@ function Login() {
                       color={useColorModeValue("blue.600", "blue.300")}
                       mb={1}
                     >
-                      50+
+                      20+
                     </Text>
                     <Text
                       fontSize="xs"
@@ -424,7 +424,7 @@ function Login() {
                       color={useColorModeValue("green.600", "green.300")}
                       mb={1}
                     >
-                      $1.2M
+                      $660K+
                     </Text>
                     <Text
                       fontSize="xs"
@@ -461,7 +461,7 @@ function Login() {
                       color={useColorModeValue("purple.600", "purple.300")}
                       mb={1}
                     >
-                      Lebron James
+                      Ken Chen
                     </Text>
                     <Text
                       fontSize="xs"
@@ -498,7 +498,7 @@ function Login() {
                       color={useColorModeValue("orange.600", "orange.300")}
                       mb={1}
                     >
-                      +12.4%
+                      +6.4%
                     </Text>
                     <Text
                       fontSize="xs"
