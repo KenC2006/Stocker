@@ -93,6 +93,11 @@ function Dashboard() {
   const prizeCardBorder = useColorModeValue("purple.200", "purple.600");
   const prizeTextColor = useColorModeValue("purple.600", "purple.300");
 
+  const ruleItemBg = useColorModeValue("whiteAlpha.200", "whiteAlpha.100");
+  const ruleBulletBg = useColorModeValue("blue.200", "blue.300");
+  const keyRulesBg = useColorModeValue("blue.600", "uoft.navy");
+  const keyRulesTextColor = useColorModeValue("white", "white");
+
   const calculateContestTimer = () => {
     const now = new Date();
     const endOfMonth = new Date(
@@ -698,8 +703,8 @@ function Dashboard() {
                     </Box>
 
                     <Box
-                      bg="uoft.navy"
-                      color="white"
+                      bg={keyRulesBg}
+                      color={keyRulesTextColor}
                       p={4}
                       borderRadius="xl"
                       boxShadow="lg"
@@ -721,13 +726,13 @@ function Dashboard() {
                             key={index}
                             spacing={2}
                             p={2}
-                            bg="whiteAlpha.100"
+                            bg={ruleItemBg}
                             borderRadius="md"
                           >
                             <Box
                               w={1.5}
                               h={1.5}
-                              bg="blue.300"
+                              bg={ruleBulletBg}
                               borderRadius="full"
                             />
                             <Text fontSize="sm" fontWeight="medium">
@@ -760,19 +765,19 @@ function Dashboard() {
                       {[
                         {
                           place: "1st",
-                          prize: "$50",
+                          prize: "tbd",
                           medal: "🥇",
                           color: "yellow",
                         },
                         {
                           place: "2nd",
-                          prize: "$25",
+                          prize: "tbd",
                           medal: "🥈",
                           color: "gray",
                         },
                         {
                           place: "3rd",
-                          prize: "$10",
+                          prize: "tbd",
                           medal: "🥉",
                           color: "orange",
                         },
