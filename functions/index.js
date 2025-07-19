@@ -19,10 +19,12 @@ exports.updateLeaderboardDaily = functions.pubsub
   .timeZone("America/Toronto")
   .onRun(async (context) => {
     const usersSnapshot = await db.collection("users").get();
-    const users = usersSnapshot.docs.map((doc) => ({
-      id: doc.id,
-      ...doc.data(),
-    }));
+    const users = usersSnapshot.docs
+      .map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      }))
+      .filter((user) => user.emailVerified === true);
 
     let apiCalls = 0;
     let minuteStart = Date.now();

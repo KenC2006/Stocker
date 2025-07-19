@@ -66,7 +66,7 @@ function Leaderboard() {
   const usersPerPage = 10;
 
   const { isOpen, onOpen, onClose } = useDisclosure();
-  const { guestMode } = useAuth();
+  const { guestMode, exitGuestMode } = useAuth();
 
   const headerBgColor = useColorModeValue("gray.50", "gray.700");
   const borderColor = useColorModeValue("gray.200", "gray.700");
@@ -110,26 +110,29 @@ function Leaderboard() {
   const fetchLeaderboardData = async () => {
     try {
       const usersSnapshot = await getDocs(collection(db, "users"));
-      const leaderboardEntries = usersSnapshot.docs.map((doc) => {
-        const userData = doc.data();
-        return {
-          userId: doc.id,
-          email: userData.email,
-          firstName: userData.firstName,
-          lastName: userData.lastName,
-          major: userData.major,
-          studyYear: userData.studyYear,
-          bio: userData.bio,
-          linkedinUrl: userData.linkedinUrl,
-          cash: userData.balance || 0,
-          portfolioValue: userData.portfolioValue || 0,
-          totalValue: userData.totalValue || 0,
-          gainLoss: userData.gainLoss || 0,
-          gainLossPercent: userData.gainLossPercent || 0,
-          initialInvestment: userData.initialInvestment || 30000,
-          lastLeaderboardUpdate: userData.lastLeaderboardUpdate,
-        };
-      });
+      const leaderboardEntries = usersSnapshot.docs
+        .map((doc) => {
+          const userData = doc.data();
+          return {
+            userId: doc.id,
+            email: userData.email,
+            firstName: userData.firstName,
+            lastName: userData.lastName,
+            major: userData.major,
+            studyYear: userData.studyYear,
+            bio: userData.bio,
+            linkedinUrl: userData.linkedinUrl,
+            cash: userData.balance || 0,
+            portfolioValue: userData.portfolioValue || 0,
+            totalValue: userData.totalValue || 0,
+            gainLoss: userData.gainLoss || 0,
+            gainLossPercent: userData.gainLossPercent || 0,
+            initialInvestment: userData.initialInvestment || 30000,
+            lastLeaderboardUpdate: userData.lastLeaderboardUpdate,
+            emailVerified: userData.emailVerified,
+          };
+        })
+        .filter((user) => user.emailVerified !== false);
       leaderboardEntries.sort((a, b) => b.totalValue - a.totalValue);
       setLeaderboardData(leaderboardEntries);
       setFilteredData(leaderboardEntries);
@@ -164,15 +167,24 @@ function Leaderboard() {
       setFilteredData(leaderboardData);
     } else {
       const searchLower = searchTerm.toLowerCase();
-      const filtered = leaderboardData.filter(
-        (user) =>
-          user.firstName.toLowerCase().includes(searchLower) ||
-          user.lastName.toLowerCase().includes(searchLower) ||
-          user.major?.toLowerCase().includes(searchLower) ||
-          user.studyYear?.toLowerCase().includes(searchLower)
-      );
+
+      const filtered = leaderboardData.filter((user) => {
+        const fullName = `${user.firstName || ""} ${
+          user.lastName || ""
+        }`.toLowerCase();
+        return (
+          (user.firstName &&
+            user.firstName.toLowerCase().includes(searchLower)) ||
+          (user.lastName &&
+            user.lastName.toLowerCase().includes(searchLower)) ||
+          fullName.includes(searchLower) ||
+          (user.major && user.major.toLowerCase().includes(searchLower)) ||
+          (user.studyYear && user.studyYear.toLowerCase().includes(searchLower))
+        );
+      });
       setFilteredData(filtered);
     }
+    setCurrentPage(1);
   }, [searchTerm, leaderboardData]);
 
   const totalPages = Math.ceil(filteredData.length / usersPerPage);
@@ -211,7 +223,7 @@ function Leaderboard() {
               boxShadow="md"
             >
               <Text fontWeight="bold" color={timerLabelColor} fontSize="lg">
-                Next Leaderboard Reset In:
+                Next Leaderboard Update In:
               </Text>
               <Text
                 fontSize={{ base: "2xl", md: "3xl" }}
@@ -226,7 +238,7 @@ function Leaderboard() {
                 {formatTime(timeLeft)}
               </Text>
               <Text fontSize="sm" color={timerSubColor}>
-                (Resets daily at 2:00am Toronto time)
+                (Updates daily at 2:00am Toronto time)
               </Text>
             </Box>
           </Box>
@@ -264,6 +276,7 @@ function Leaderboard() {
                     colorScheme="blue"
                     size="sm"
                     leftIcon={<FaUser />}
+                    onClick={exitGuestMode}
                     _hover={{
                       transform: "translateY(-1px)",
                       boxShadow: "md",
@@ -277,6 +290,7 @@ function Leaderboard() {
                     to="/login"
                     variant="outline"
                     size="sm"
+                    onClick={exitGuestMode}
                     _hover={{
                       transform: "translateY(-1px)",
                       boxShadow: "md",

@@ -2,7 +2,7 @@ import { extendTheme } from "@chakra-ui/react";
 
 const colors = {
   uoft: {
-    navy: "#002A5C", // UofT Navy Blue
+    navy: "#002A5C",
     lightBlue: "#007FA3",
     gold: "#FFE498",
     white: "#FFFFFF",
