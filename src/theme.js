@@ -22,6 +22,10 @@ const colors = {
 };
 
 const theme = extendTheme({
+  config: {
+    initialColorMode: "dark",
+    useSystemColorMode: false,
+  },
   colors: {
     ...colors,
     brand: {
