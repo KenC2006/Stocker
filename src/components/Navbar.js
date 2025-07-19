@@ -71,7 +71,7 @@ import {
   writeBatch,
   serverTimestamp,
 } from "firebase/firestore";
-import { db } from "../config/firebase";
+import { db, auth } from "../config/firebase";
 import {
   getAuth,
   sendPasswordResetEmail,
@@ -191,10 +191,16 @@ function Navbar() {
     if (!currentUser) return;
     setIsReauthenticating(true);
     try {
-      const providerData = currentUser.providerData[0];
+      let currentAuthUser = auth.currentUser;
+      if (!currentAuthUser) {
+        throw new Error("No authenticated user found");
+      }
+
+      const providerData = currentAuthUser.providerData[0];
       if (providerData && providerData.providerId === "google.com") {
         const provider = new GoogleAuthProvider();
-        await reauthenticateWithPopup(currentUser, provider);
+        await reauthenticateWithPopup(currentAuthUser, provider);
+        currentAuthUser = auth.currentUser;
       } else if (providerData && providerData.providerId === "password") {
         if (!reauthPassword) {
           toast({
@@ -208,17 +214,28 @@ function Navbar() {
           return;
         }
         const credential = EmailAuthProvider.credential(
-          currentUser.email,
+          currentAuthUser.email,
           reauthPassword
         );
-        await reauthenticateWithCredential(currentUser, credential);
+        await reauthenticateWithCredential(currentAuthUser, credential);
+        currentAuthUser = auth.currentUser;
       }
+
+      if (!currentAuthUser || !currentAuthUser.uid) {
+        throw new Error("User object became invalid after re-authentication");
+      }
+
+      try {
+        await currentAuthUser.reload();
+        currentAuthUser = auth.currentUser;
+      } catch (reloadError) {}
+
       const batch = writeBatch(db);
-      const userRef = doc(db, "users", currentUser.uid);
+      const userRef = doc(db, "users", currentAuthUser.uid);
       batch.delete(userRef);
       const stocksQuery = query(
         collection(db, "stocks"),
-        where("userId", "==", currentUser.uid)
+        where("userId", "==", currentAuthUser.uid)
       );
       const stocksSnapshot = await getDocs(stocksQuery);
       stocksSnapshot.docs.forEach((doc) => {
@@ -226,14 +243,14 @@ function Navbar() {
       });
       const transactionsQuery = query(
         collection(db, "transactions"),
-        where("userId", "==", currentUser.uid)
+        where("userId", "==", currentAuthUser.uid)
       );
       const transactionsSnapshot = await getDocs(transactionsQuery);
       transactionsSnapshot.docs.forEach((doc) => {
         batch.delete(doc.ref);
       });
       await batch.commit();
-      await deleteUser(currentUser);
+      await deleteUser(currentAuthUser);
 
       setIsReauthModalOpen(false);
       onAccountClose();
@@ -263,6 +280,26 @@ function Navbar() {
           description: "Google re-authentication was cancelled.",
           status: "error",
           duration: 3000,
+          isClosable: true,
+        });
+      } else if (error.message === "No authenticated user found") {
+        toast({
+          title: "Authentication Error",
+          description: "Please log in again to delete your account.",
+          status: "error",
+          duration: 3000,
+          isClosable: true,
+        });
+      } else if (
+        error.message &&
+        error.message.includes("_updateTokensIfNecessary")
+      ) {
+        toast({
+          title: "Authentication Error",
+          description:
+            "Please refresh the page and try again. The user session may have expired.",
+          status: "error",
+          duration: 5000,
           isClosable: true,
         });
       } else {
@@ -404,27 +441,29 @@ function Navbar() {
                     Dashboard
                   </Button>
                 )}
-                <Button
-                  as={Link}
-                  to="/trading"
-                  leftIcon={<FaExchangeAlt />}
-                  borderRadius="full"
-                  px={6}
-                  py={2}
-                  fontSize="md"
-                  fontWeight={isActive("/trading") ? "bold" : "normal"}
-                  bgGradient={isActive("/trading") ? navButtonBg : undefined}
-                  color={isActive("/trading") ? "white" : navTextColor}
-                  _hover={{
-                    bg: navButtonHover,
-                    color: "white",
-                    boxShadow: "md",
-                  }}
-                  transition="all 0.2s"
-                  variant={isActive("/trading") ? "solid" : "ghost"}
-                >
-                  Trading
-                </Button>
+                {(guestMode || (currentUser && currentUser.emailVerified)) && (
+                  <Button
+                    as={Link}
+                    to="/trading"
+                    leftIcon={<FaExchangeAlt />}
+                    borderRadius="full"
+                    px={6}
+                    py={2}
+                    fontSize="md"
+                    fontWeight={isActive("/trading") ? "bold" : "normal"}
+                    bgGradient={isActive("/trading") ? navButtonBg : undefined}
+                    color={isActive("/trading") ? "white" : navTextColor}
+                    _hover={{
+                      bg: navButtonHover,
+                      color: "white",
+                      boxShadow: "md",
+                    }}
+                    transition="all 0.2s"
+                    variant={isActive("/trading") ? "solid" : "ghost"}
+                  >
+                    Trading
+                  </Button>
+                )}
                 <Button
                   as={Link}
                   to="/leaderboard"
@@ -620,22 +659,6 @@ function Navbar() {
                   color="blue.500"
                 >
                   github.com/uoftstocker
-                </ChakraLink>
-              </Box>
-
-              <Box>
-                <HStack spacing={3} mb={2}>
-                  <Icon as={FaLinkedin} color="blue.500" boxSize={5} />
-                  <Text fontWeight="bold" color={menuItemTextColor}>
-                    LinkedIn
-                  </Text>
-                </HStack>
-                <ChakraLink
-                  href="https://linkedin.com/company/uoftstocker"
-                  isExternal
-                  color="blue.500"
-                >
-                  linkedin.com/company/uoftstocker
                 </ChakraLink>
               </Box>
 

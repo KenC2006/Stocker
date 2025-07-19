@@ -25,6 +25,7 @@ import {
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { getAuth, sendPasswordResetEmail } from "firebase/auth";
+import { checkFirestoreVerification } from "../utils/auth";
 import {
   FaEye,
   FaEyeSlash,
@@ -116,8 +117,20 @@ function Login() {
     e.preventDefault();
     try {
       setLoading(true);
-      await login(email, password);
-      navigate("/dashboard");
+      const userCredential = await login(email, password);
+
+      if (userCredential.user.emailVerified) {
+        navigate("/dashboard");
+      } else {
+        const firestoreVerified = await checkFirestoreVerification(
+          userCredential.user.uid
+        );
+        if (firestoreVerified) {
+          navigate("/dashboard");
+        } else {
+          navigate("/email-verification");
+        }
+      }
     } catch (error) {
       toast({
         title: "Login Failed",
@@ -461,7 +474,7 @@ function Login() {
                       color={useColorModeValue("purple.600", "purple.300")}
                       mb={1}
                     >
-                      Ken Chen
+                      Anson Chung
                     </Text>
                     <Text
                       fontSize="xs"

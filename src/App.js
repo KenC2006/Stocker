@@ -7,18 +7,26 @@ import {
   Navigate,
 } from "react-router-dom";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
+import { isUserVerified, checkFirestoreVerification } from "./utils/auth";
 import Login from "./components/Login";
 import SignUp from "./components/SignUp";
 import Dashboard from "./components/Dashboard";
 import Leaderboard from "./components/Leaderboard";
 import Trading from "./components/Trading";
+import EmailVerification from "./components/EmailVerification";
 import Navbar from "./components/Navbar";
+import { useVerificationStatus } from "./components/VerificationCheck";
 import theme from "./theme";
 
 const PrivateRoute = ({ children }) => {
   const { currentUser, guestMode } = useAuth();
+  const { isVerified, loading } = useVerificationStatus();
+
   if (guestMode) return <Navigate to="/leaderboard" />;
-  return currentUser ? children : <Navigate to="/login" />;
+  if (!currentUser) return <Navigate to="/login" />;
+  if (loading) return <div>Loading...</div>;
+  if (!isVerified) return <Navigate to="/email-verification" />;
+  return children;
 };
 
 const GuestRoute = ({ children }) => {
@@ -26,10 +34,25 @@ const GuestRoute = ({ children }) => {
   return currentUser || guestMode ? children : <Navigate to="/login" />;
 };
 
+const VerifiedRoute = ({ children }) => {
+  const { currentUser, guestMode } = useAuth();
+  const { isVerified, loading } = useVerificationStatus();
+
+  if (guestMode) return children;
+  if (!currentUser) return <Navigate to="/login" />;
+  if (loading) return <div>Loading...</div>;
+  if (!isVerified) return <Navigate to="/email-verification" />;
+  return children;
+};
+
 const RootRoute = () => {
   const { currentUser, guestMode } = useAuth();
+  const { isVerified, loading } = useVerificationStatus();
+
   if (guestMode) return <Navigate to="/leaderboard" />;
-  if (currentUser) return <Navigate to="/dashboard" />;
+  if (loading) return <div>Loading...</div>;
+  if (currentUser && isVerified) return <Navigate to="/dashboard" />;
+  if (currentUser && !isVerified) return <Navigate to="/email-verification" />;
   return <Navigate to="/login" />;
 };
 
@@ -44,6 +67,10 @@ function App() {
             <Routes>
               <Route path="/login" element={<Login />} />
               <Route path="/signup" element={<SignUp />} />
+              <Route
+                path="/email-verification"
+                element={<EmailVerification />}
+              />
               <Route
                 path="/dashboard"
                 element={
@@ -63,9 +90,9 @@ function App() {
               <Route
                 path="/trading"
                 element={
-                  <GuestRoute>
+                  <VerifiedRoute>
                     <Trading />
-                  </GuestRoute>
+                  </VerifiedRoute>
                 }
               />
               <Route path="/" element={<RootRoute />} />

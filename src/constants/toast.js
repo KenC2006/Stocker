@@ -1,0 +1,6 @@
+export const TOAST_DURATIONS = {
+  SHORT: 3000,
+  MEDIUM: 4000,
+  LONG: 5000,
+  EXTRA_LONG: 6000,
+};

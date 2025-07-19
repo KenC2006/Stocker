@@ -216,6 +216,18 @@ function Trading() {
       return;
     }
 
+    if (currentUser && !currentUser.emailVerified) {
+      toast({
+        title: "Email Verification Required",
+        description:
+          "Please verify your email before trading. Check your inbox for a verification link.",
+        status: "warning",
+        duration: 5000,
+        isClosable: true,
+      });
+      return;
+    }
+
     if (!marketOpen) {
       toast({
         title: "Market Closed",
@@ -323,6 +335,18 @@ function Trading() {
         description: "Please sign up to start trading!",
         status: "info",
         duration: 4000,
+        isClosable: true,
+      });
+      return;
+    }
+
+    if (currentUser && !currentUser.emailVerified) {
+      toast({
+        title: "Email Verification Required",
+        description:
+          "Please verify your email before trading. Check your inbox for a verification link.",
+        status: "warning",
+        duration: 5000,
         isClosable: true,
       });
       return;

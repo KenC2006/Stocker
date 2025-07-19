@@ -24,6 +24,7 @@ import {
 } from "@chakra-ui/react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
+import { TOAST_DURATIONS } from "../constants/toast";
 import {
   FaEye,
   FaEyeSlash,
@@ -60,7 +61,6 @@ function SignUp() {
   const inputFocusBg = useColorModeValue("white", "gray.600");
   const placeholderColor = useColorModeValue("gray.500", "gray.400");
   const iconColor = useColorModeValue("gray.500", "gray.300");
-  const errorColor = useColorModeValue("red.500", "red.300");
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -70,17 +70,7 @@ function SignUp() {
         title: "Error",
         description: "Passwords do not match",
         status: "error",
-        duration: 5000,
-        isClosable: true,
-      });
-    }
-
-    if (!email.endsWith("@mail.utoronto.ca")) {
-      return toast({
-        title: "Invalid Email",
-        description: "Please use your UofT email address (@mail.utoronto.ca)",
-        status: "error",
-        duration: 5000,
+        duration: TOAST_DURATIONS.LONG,
         isClosable: true,
       });
     }
@@ -97,16 +87,19 @@ function SignUp() {
         studyYear,
         createdAt: new Date().toISOString(),
         balance: 30000,
+        emailVerified: false,
       });
 
       toast({
-        title: "Account created",
-        description: "You have successfully signed up!",
+        title: "Account Created Successfully!",
+        description:
+          "Please check your email and verify your account to start trading.",
         status: "success",
-        duration: 5000,
+        duration: TOAST_DURATIONS.LONG,
         isClosable: true,
       });
-      navigate("/dashboard");
+
+      navigate("/email-verification");
     } catch (error) {
       let errorMessage = error.message;
 
@@ -117,14 +110,14 @@ function SignUp() {
         errorMessage =
           "An account with this email already exists. Please try logging in instead.";
       } else if (error.code === "auth/invalid-email") {
-        errorMessage = "Please enter a valid UofT email address.";
+        errorMessage = "Please enter a valid email address.";
       }
 
       toast({
         title: "Error",
         description: errorMessage,
         status: "error",
-        duration: 5000,
+        duration: TOAST_DURATIONS.LONG,
         isClosable: true,
       });
     } finally {
@@ -195,7 +188,7 @@ function SignUp() {
                       Student Community
                     </Text>
                     <Text fontSize="sm" color={subtitleColor}>
-                      Connect with fellow UofT students on the leaderboard
+                      Connect with fellow students on the leaderboard
                     </Text>
                   </Box>
                 </HStack>
@@ -313,12 +306,9 @@ function SignUp() {
                     </FormControl>
                   </SimpleGrid>
 
-                  <FormControl
-                    isRequired
-                    isInvalid={email && !email.endsWith("@mail.utoronto.ca")}
-                  >
+                  <FormControl isRequired>
                     <FormLabel fontWeight="semibold" color={labelColor}>
-                      UofT Email Address
+                      Email Address
                     </FormLabel>
                     <Input
                       type="email"
@@ -327,7 +317,7 @@ function SignUp() {
                       size="lg"
                       borderRadius="lg"
                       borderWidth="2px"
-                      placeholder="your.email@mail.utoronto.ca"
+                      placeholder="your.email@example.com"
                       bg={inputBg}
                       color={inputColor}
                       _focus={{
@@ -342,11 +332,6 @@ function SignUp() {
                         color: placeholderColor,
                       }}
                     />
-                    {email && !email.endsWith("@mail.utoronto.ca") && (
-                      <Text fontSize="sm" color={errorColor} mt={1}>
-                        Please use your UofT email address (@mail.utoronto.ca)
-                      </Text>
-                    )}
                   </FormControl>
 
                   <SimpleGrid columns={{ base: 1, md: 2 }} spacing={4} w="100%">
