@@ -1,6 +1,6 @@
 # Stocker
 
-Stocker is a full-stack stock trading simulation web application designed for students. It allows users to search for stocks, simulate buying and selling, manage a virtual portfolio, and compete on a live leaderboard. The app features real-time price updates, a scheduled leaderboard reset, and a UI built with React and Chakra UI.
+Stocker is a full-stack stock trading simulator designed for students. It allows users to search for stocks, simulate buying and selling, manage a virtual portfolio, and compete on a live leaderboard. The app features real-time price updates, a scheduled leaderboard reset, and a UI built with React and Chakra UI.
 
 ## Features
 
